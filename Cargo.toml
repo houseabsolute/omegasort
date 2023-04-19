@@ -1,0 +1,33 @@
+[package]
+name = "omegasort"
+version = "0.1.0"
+authors = ["Dave Rolsky <autarch@urth.org>"]
+description = "The last text sorting tool you'll ever need"
+repository = "https://github.com/houseabsolute/omegasort"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.71"
+chrono = "0.4.24"
+clap = { version = "4.2.7", features = ["derive", "wrap_help"] }
+dateparser = "0.2.0"
+fern = { version = "0.6.2", features = ["colored"] }
+icu = "1.2.0"
+icu_provider = "1.2.0"
+icu_provider_adapters = "1.2.0"
+ipnet = "2.7.2"
+lazy-regex = "2.5.0"
+log = "0.4.17"
+tempfile = "3.5.0"
+termimad = "0.23.0"
+thiserror = "1.0.40"
+typed-path = "0.3.2"
+zerovec = "0.9.4"
+
+[dev-dependencies]
+tempfile = "3.5.0"
+test-case = "3.1.0"

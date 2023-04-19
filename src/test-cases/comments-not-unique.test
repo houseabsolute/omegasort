@@ -1,0 +1,24 @@
+--sort text --comment-prefix #
+####
+HasUnexpectedEmptyLines
+####
+foo
+
+# This is a comment on the first bar.
+bar
+
+# This is a comment on the second bar.
+bar
+
+quux
+
+baz
+####
+# This is a comment on the first bar.
+bar
+
+# This is a comment on the second bar.
+bar
+baz
+foo
+quux

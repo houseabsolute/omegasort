@@ -1,0 +1,28 @@
+::icu::collator::provider::CollationDataV1 {
+    trie: ::icu::collections::codepointtrie::CodePointTrie::from_parts(
+        ::icu::collections::codepointtrie::CodePointTrieHeader {
+            high_start: 55296u32,
+            shifted12_high_start: 14u16,
+            index3_null_offset: 24u16,
+            data_null_offset: 0u32,
+            null_value: 192u32,
+            trie_type: ::icu::collections::codepointtrie::TrieType::Small,
+        },
+        unsafe {
+            :: zerovec :: ZeroVec :: from_bytes_unchecked (b"\0\0@\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0o\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x96\0\x9E\0\xA8\0\xBE\0\0\0\x10\0 \x000\0@\0P\0`\0p\0\0\0\x10\0 \x000\0\0\0\x10\0 \x000\0\0\0\x10\0 \x000\0\0\0\x10\0 \x000\0\0\0\x10\0 \x000\0\0\0\x10\0 \x000\0\0\0\x10\0 \x000\0\0\0\x10\0 \x000\0o\0\x7F\0\x8F\0\x9F\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xAF\0\xBB\0\0\0\0\0\0\0\0\0\0\0D\0L\0P\0L\0L\0L\0L\0L\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0\x18\0p\0p\0p\0p\0p\0p\0p\0p\0p\0p\0p\0v\0")
+        },
+        unsafe {
+            :: zerovec :: ZeroVec :: from_bytes_unchecked (b"\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC9\x06\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC9\xEC\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC9\xCC\x02\0\xC0\0\0\0\xC9&\x04\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC5\x02\0\0\xC9\x06\x05\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC9\xE6\x05\0\xC9\xC6\x06\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC9\xA6\x07\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xCC\x01\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0\xC0\0\0\0")
+        },
+        192u32,
+    ),
+    ces: ::zerovec::ZeroVec::new(),
+    ce32s: unsafe {
+        ::zerovec::ZeroVec::from_bytes_unchecked(
+            b"\x05\x05&e\xC2\x06\xE4\xE3 \x05\x18e \x05\x18e",
+        )
+    },
+    contexts: unsafe {
+        :: zerovec :: ZeroVec :: from_bytes_unchecked (b"\x08e\x05\x050\0\xBF\x05\xFF\xFF\te\x05\x05\x10e\x05\x05\x02\0\xBC\x05\xFF\xFF\x10e\x05F\xD5\x05\xFF\xFF\x10e\x05G\xD9\x05\xFF\xFF\x10e\x05H\x18e\x05\x05\x01\0\xB4\x05\xFF\xFF\x18e\x05F\xD9\x05\xFF\xFF\x18e\x05G\x1Ae\x05\x050\0\xBC\x05\xFF\xFF\x19e\x05\x05&e\x05\x050\0\xBC\x05\xFF\xFF%e\x05\x05.e\x05\x050\0\xC2\x05\xFF\xFF/e\xC1\x020e\x05\x050\0\xBC\x05\xFF\xFF/e\xC1\x03\0\0\xC5B0\0\xB7\x05\xFF\xFF\x18e\x05H")
+    },
+}

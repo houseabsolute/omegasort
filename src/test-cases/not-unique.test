@@ -1,0 +1,12 @@
+--sort text --unique
+####
+NotUnique
+####
+bar
+baz
+baz
+foo
+####
+bar
+baz
+foo

@@ -1,0 +1,14 @@
+--sort text --unique
+####
+HasUnexpectedEmptyLines
+####
+bar
+baz
+
+foo
+
+
+####
+bar
+baz
+foo
