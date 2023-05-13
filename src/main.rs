@@ -23,8 +23,12 @@ use std::{
 use tempfile::NamedTempFile;
 use termimad::MadSkin;
 
+const MAX_TERM_WIDTH: usize = 100;
+
 #[derive(Parser)]
 #[command(author, version, about)]
+#[clap(max_term_width = MAX_TERM_WIDTH)]
+#[clap(after_long_help = long_help())]
 struct Cli {
     /// The type of sorting to use.
     #[arg(short, long, value_enum)]
@@ -72,8 +76,6 @@ struct Cli {
     #[arg(long)]
     debug: bool,
 }
-
-const MAX_TERM_WIDTH: usize = 100;
 
 fn main() {
     let status = match Cli::new_from_args(args_os()) {
@@ -156,10 +158,7 @@ impl Cli {
         I: IntoIterator<Item = T>,
         T: Into<OsString> + Clone,
     {
-        let mut command = Cli::command();
-        command = command
-            .max_term_width(MAX_TERM_WIDTH)
-            .after_long_help(long_help());
+        let command = Cli::command();
         Cli::from_arg_matches(&command.get_matches_from(args)).map_err(|e| e.into())
     }
 
