@@ -1,4 +1,8 @@
-## 0.1.0 - 2023-05-20
+## 0.1.1 - 2023-05-20
+
+- Fixed the release orchestration so releases are only built with stable Rust.
+
+## 0.1.0 - pulled
 
 - I rewrote it in Rust (RIIR).
 - Added the ability to preserve comments in files when sorting. Use the `--comment-prefix` option
