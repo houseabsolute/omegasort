@@ -13,7 +13,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.71"
 chrono = "0.4.24"
-clap = { version = "4.2.7", features = ["derive", "wrap_help"] }
+clap = { version = "4.3.0", features = ["derive", "wrap_help"] }
 dateparser = "0.2.0"
 fern = { version = "0.6.2", features = ["colored"] }
 icu = "1.2.0"
