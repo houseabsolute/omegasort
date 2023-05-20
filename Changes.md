@@ -1,4 +1,4 @@
-## 0.1.0
+## 0.1.0 - 2023-05-20
 
 - I rewrote it in Rust (RIIR).
 - Added the ability to preserve comments in files when sorting. Use the `--comment-prefix` option
