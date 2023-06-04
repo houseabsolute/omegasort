@@ -1,4 +1,4 @@
-## 0.1.2
+## 0.1.2 - 2023-06-04
 
 - Sorting is now done in parallel using [rayon](https://docs.rs/rayon/latest/rayon/). This
   significantly improves sorting of large files. In my experiments, a c. 100MB file went from 12s to

@@ -1,6 +1,6 @@
 [package]
 name = "omegasort"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Dave Rolsky <autarch@urth.org>"]
 description = "The last text sorting tool you'll ever need"
 repository = "https://github.com/houseabsolute/omegasort"
