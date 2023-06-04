@@ -13,6 +13,7 @@ function install_tools () {
         sh
     run "rustup component add clippy"
     run "ubi --project houseabsolute/precious --in ~/bin"
+    run "ubi --project houseabsolute/omegasort --in ~/bin"
     run "npm install prettier"
 }
 
