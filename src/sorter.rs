@@ -9,7 +9,8 @@ use crate::{
 };
 use anyhow::Result;
 use clap::ValueEnum;
-use std::{cmp::Ordering, collections::HashMap};
+use rayon::prelude::*;
+use std::{cmp::Ordering, collections::HashMap, sync::Mutex};
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub(crate) enum Strategy {
@@ -32,7 +33,7 @@ impl Strategy {
 }
 
 pub(crate) struct Sorter {
-    comparer: Box<dyn Comparer>,
+    comparer: Box<dyn Comparer + Sync>,
     unique: bool,
     reverse: bool,
 }
@@ -51,7 +52,7 @@ impl Sorter {
         } else {
             None
         };
-        let comparer: Box<dyn Comparer> = match strategy {
+        let comparer: Box<dyn Comparer + Sync> = match strategy {
             Strategy::Text => Box::new(TextComparer::new(collator, case_insensitive)),
             Strategy::NumberedText => {
                 Box::new(NumberedTextComparer::new(collator, case_insensitive))
@@ -121,15 +122,19 @@ impl Sorter {
     }
 
     pub(crate) fn sort_lines(&self, mut lines: Vec<SortableLine>) -> Result<Vec<SortableLine>> {
-        let mut res = Ok(());
-        lines.sort_by(|a, b| match self.comparer.cmp(&a.line, &b.line) {
+        let res = Mutex::new(Ok(()));
+        lines.par_sort_by(|a, b| match self.comparer.cmp(&a.line, &b.line) {
             Ok(o) => o,
             Err(e) => {
-                res = Err(e);
+                // If there are multiple errors, only the last one will be
+                // visible, but that's fine.
+                *res.lock().unwrap() = Err(e);
                 Ordering::Less
             }
         });
-        res?;
+        // The first `?` is for the `MutexGuard` and the second is for the
+        // underlying `Result`.
+        res.into_inner()??;
 
         if self.reverse {
             lines.reverse();

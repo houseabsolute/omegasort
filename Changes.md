@@ -1,3 +1,9 @@
+## 0.1.2
+
+- Sorting is now done in parallel using [rayon](https://docs.rs/rayon/latest/rayon/). This
+  significantly improves sorting of large files. In my experiments, a c. 100MB file went from 12s to
+  8s. A c. 1GB file went from 2m40s to 1m40s.
+
 ## 0.1.1 - 2023-05-20
 
 - Fixed the release orchestration so releases are only built with stable Rust.

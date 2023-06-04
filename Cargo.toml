@@ -17,11 +17,12 @@ clap = { version = "4.3.0", features = ["derive", "wrap_help"] }
 dateparser = "0.2.0"
 fern = { version = "0.6.2", features = ["colored"] }
 icu = "1.2.0"
-icu_provider = "1.2.0"
+icu_provider = { version = "1.2.0", features = ["sync"] }
 icu_provider_adapters = "1.2.0"
 ipnet = "2.7.2"
 lazy-regex = "2.5.0"
 log = "0.4.17"
+rayon = "1.7.0"
 tempfile = "3.5.0"
 termimad = "0.23.0"
 thiserror = "1.0.40"
