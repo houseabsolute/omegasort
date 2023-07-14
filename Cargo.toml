@@ -13,19 +13,19 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.71"
 chrono = "0.4.26"
-clap = { version = "4.3.3", features = ["derive", "wrap_help"] }
+clap = { version = "4.3.12", features = ["derive", "wrap_help"] }
 dateparser = "0.2.0"
 fern = { version = "0.6.2", features = ["colored"] }
 icu = "1.2.0"
 icu_provider = { version = "1.2.0", features = ["sync"] }
 icu_provider_adapters = "1.2.0"
-ipnet = "2.7.2"
-lazy-regex = "2.5.0"
+ipnet = "2.8.0"
+lazy-regex = "3.0.0"
 log = "0.4.19"
 rayon = "1.7.0"
 tempfile = "3.6.0"
-termimad = "0.23.0"
-thiserror = "1.0.40"
+termimad = "0.23.1"
+thiserror = "1.0.43"
 typed-path = "0.3.2"
 zerovec = "0.9.4"
 
