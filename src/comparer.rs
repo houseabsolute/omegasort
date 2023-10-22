@@ -7,8 +7,9 @@ use lazy_regex::regex;
 use log::debug;
 use std::cmp::Ordering;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use typed_path::windows::Utf8WindowsComponent;
-use typed_path::{Utf8Component, Utf8Encoding, Utf8Path, Utf8UnixPath, Utf8WindowsPath};
+use typed_path::{
+    Utf8Component, Utf8Encoding, Utf8Path, Utf8UnixPath, Utf8WindowsComponent, Utf8WindowsPath,
+};
 
 pub(crate) trait Comparer {
     fn is_ordered(&self, str1: &str, str2: &str, reverse: bool) -> Result<bool> {
