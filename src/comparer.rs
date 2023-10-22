@@ -905,7 +905,7 @@ datetime and dates
 false
 "#;
 
-    const PATH_TEST_CASES: &str = r#"
+    const PATH_TEST_CASES: &str = r"
 path with ASCII text
 ----
 /foo
@@ -1033,7 +1033,7 @@ baz/quux
 false
 ----
 sv-SE
-"#;
+";
 
     const IP_TEST_CASES: &str = r#"
 ip with just IPv4
