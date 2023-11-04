@@ -1,3 +1,8 @@
+## 0.1.3
+
+- When sorting a file with repeated lines with a `--locale`, the sorting order was not always
+  consistent, and the `--unique` flag could leave duplicates behind.
+
 ## 0.1.2 - 2023-06-04
 
 - Sorting is now done in parallel using [rayon](https://docs.rs/rayon/latest/rayon/). This

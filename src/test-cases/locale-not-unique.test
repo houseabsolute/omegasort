@@ -1,0 +1,14 @@
+--sort text --case-insensitive --locale en-US --unique
+####
+NotSorted
+####
+ª
+A
+a
+ª
+A
+a
+####
+A
+a
+ª

@@ -444,7 +444,16 @@ fn compare_two_strings(
     str2: &str,
 ) -> Ordering {
     if let Some(c) = collator {
-        c.compare(str1, str2)
+        let ord = c.compare(str1, str2);
+        if ord != Ordering::Equal {
+            return ord;
+        }
+        // If the strings are equal according to the collator they may still
+        // be different, in which case we want to further sort them
+        // somehow. Otherwise they end up sorted based on their original order
+        // in the file, which is random and means two files containing the
+        // same lines in different order could be sorted differently.
+        str1.cmp(str2)
     } else if case_insensitive {
         str1.to_lowercase().cmp(&str2.to_lowercase())
     } else {
