@@ -46,26 +46,6 @@ jobs:
             target: i686-unknown-linux-musl
             bin: omegasort
             name: omegasort-Linux-i686-musl.tar.gz
-          - os_name: Linux-mips
-            os: ubuntu-20.04
-            target: mips-unknown-linux-musl
-            bin: omegasort
-            name: omegasort-Linux-mips.tar.gz
-          - os_name: Linux-mipsel
-            os: ubuntu-20.04
-            target: mipsel-unknown-linux-musl
-            bin: omegasort
-            name: omegasort-Linux-mipsel.tar.gz
-          - os_name: Linux-mips64
-            os: ubuntu-20.04
-            target: mips64-unknown-linux-muslabi64
-            bin: omegasort
-            name: omegasort-Linux-mips64.tar.gz
-          - os_name: Linux-mips64el
-            os: ubuntu-20.04
-            target: mips64el-unknown-linux-muslabi64
-            bin: omegasort
-            name: omegasort-Linux-mips64el.tar.gz
           - os_name: Linux-powerpc
             os: ubuntu-20.04
             target: powerpc-unknown-linux-gnu

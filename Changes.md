@@ -2,6 +2,8 @@
 
 - When sorting a file with repeated lines with a `--locale`, the sorting order was not always
   consistent, and the `--unique` flag could leave duplicates behind.
+- As of this release there are no longer binaries built for MIPS on Linux. These targets have been
+  demoted to tier 3 support by the Rust compiler.
 
 ## 0.1.2 - 2023-06-04
 
