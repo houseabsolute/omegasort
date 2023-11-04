@@ -42,13 +42,10 @@
 
 - Fix handling of errors during initialization. These sorts of error could lead to a confusing panic
   instead of showing the actual error message.
-
 - Handle the case where stdout is not connected to the terminal. Previously this caused an error
   during initialization.
-
 - Replace file renaming with copying to handle the case where the temp file we sort into and the
   original file are not on the same partition.
-
 - Fix bug where sorting wasn't stable in the presence of two case-insensitively identical lines (and
   possibly other similar scenarios).
 
