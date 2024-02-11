@@ -271,8 +271,8 @@ impl Cli {
         }
 
         // If we don't make this in the same directory as the original file,
-        // then the `persist` call later may fail because we can rename files
-        // across filesystems.
+        // then the `persist` call later may fail because we may end up trying
+        // to rename files across filesystems.
         let mut file = NamedTempFile::new_in(self.file.parent().unwrap())?;
         write_lines_to_writer(lines, line_ending, &mut file)?;
         let temp_path = file.path().to_path_buf();
