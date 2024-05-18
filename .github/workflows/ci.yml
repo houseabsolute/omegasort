@@ -112,20 +112,22 @@ jobs:
       - name: Cache cargo & target directories
         uses: Swatinem/rust-cache@v2
       - name: Build binary
-        uses: houseabsolute/actions-rust-cross@v0
+        uses: houseabsolute/actions-rust-cross@cross-git
         with:
           command: "build"
           target: ${{ matrix.platform.target }}
           toolchain: ${{ matrix.toolchain }}
           args: "--locked --release"
           strip: true
+          cross-version: 19be834
       - name: Run tests
-        uses: houseabsolute/actions-rust-cross@v0
+        uses: houseabsolute/actions-rust-cross@cross-git
         with:
           command: "test"
           target: ${{ matrix.platform.target }}
           toolchain: ${{ matrix.toolchain }}
           args: "--locked --release"
+          cross-version: 19be834
         if: ${{ !matrix.platform.skip_tests }}
       - name: Package as archive
         shell: bash
