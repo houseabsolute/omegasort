@@ -103,7 +103,6 @@ jobs:
             target: aarch64-apple-darwin
             bin: omegasort
             name: omegasort-Darwin-aarch64.tar.gz
-            skip_tests: true
         toolchain:
           - stable
           - beta
