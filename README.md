@@ -123,3 +123,29 @@ If there are two networks with the same base address they are sorted with the la
 (so 1.1.1.0/24 comes before 1.1.1.0/28). IPv4 networks always sort before IPv6 networks.
 
 This sorting method accepts the `--reverse` flag.
+
+## Linting and Tidying this Code
+
+The code in this repo is linted and tidied with
+[`precious`](https://github.com/houseabsolute/precious). This repo contains a `mise.toml` file.
+[Mise](https://mise.jdx.dev/) is a tool for managing dev tools with per-repo configuration. You can
+install `mise` and use it to run `precious` as follows:
+
+```
+# Installs mise
+curl https://mise.run | sh
+# Installs precious and other dev tools
+mise install
+```
+
+Once this is done, you can run `precious` via `mise`:
+
+```
+# Lints all code
+mise exec -- precious lint -a
+# Tidies all code
+mise exec -- precious tidy -a
+```
+
+If you want to use `mise` for other projects, see [its documentation](https://mise.jdx.dev/) for
+more details on how you can configure your shell to always activate `mise`.
