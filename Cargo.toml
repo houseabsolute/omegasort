@@ -11,23 +11,23 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.79"
-chrono = "0.4.33"
-clap = { version = "4.5.0", features = ["derive", "wrap_help"] }
+anyhow = "1.0.95"
+chrono = "0.4.39"
+clap = { version = "4.5.23", features = ["derive", "wrap_help"] }
 dateparser = "0.2.1"
-fern = { version = "0.6.2", features = ["colored"] }
-icu = { version = "1.4.0", features = ["sync"] }
-ipnet = "2.9.0"
-lazy-regex = "3.1.0"
-log = "0.4.20"
-rayon = "1.8.1"
-tempfile = "3.10.0"
-termimad = "0.29.1"
-thiserror = "1.0.56"
-typed-path = "0.6.0"
+fern = { version = "0.7.1", features = ["colored"] }
+icu = { version = "1.5.0", features = ["sync"] }
+ipnet = "2.10.1"
+lazy-regex = "3.3.0"
+log = "0.4.22"
+rayon = "1.10.0"
+tempfile = "3.14.0"
+termimad = "0.31.1"
+thiserror = "2.0.9"
+typed-path = "0.10.0"
 
 [dev-dependencies]
-tempfile = "3.10.0"
+tempfile = "3.14.0"
 test-case = "3.3.1"
 test-log = "0.2.16"
 
