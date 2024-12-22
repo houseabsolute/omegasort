@@ -154,6 +154,7 @@ mod test {
     use super::{Sorter, Strategy};
     use crate::SortableLine;
     use anyhow::Result;
+    use test_log::test;
 
     #[test]
     fn sort_lines() -> Result<()> {

@@ -498,6 +498,7 @@ mod test {
         PathComparer, PathType, TextComparer,
     };
     use crate::collation::collator_for_locale;
+    use test_log::test;
 
     struct Case {
         name: &'static str,
@@ -510,7 +511,6 @@ mod test {
 
     #[test]
     fn text_comparer() {
-        //crate::logging::init(true)?;
         for mut c in cases_from(TEXT_TEST_CASES) {
             println!("# text - {}", c.name);
             let tc = TextComparer {
@@ -526,7 +526,6 @@ mod test {
 
     #[test]
     fn numbered_text_comparer() {
-        //crate::logging::init(true)?;
         for mut c in cases_from(TEXT_TEST_CASES)
             .into_iter()
             .chain(cases_from(NUMBERED_TEXT_TEST_CASES))
@@ -545,7 +544,6 @@ mod test {
 
     #[test]
     fn datetime_text_comparer() {
-        //crate::logging::init(true)?;
         for mut c in cases_from(TEXT_TEST_CASES)
             .into_iter()
             .chain(cases_from(DATETIME_TEXT_TEST_CASES))
@@ -564,7 +562,6 @@ mod test {
 
     #[test]
     fn path_comparer() {
-        //crate::logging::init(true)?;
         for mut c in cases_from(PATH_TEST_CASES) {
             println!("# path - {}", c.name);
             let pc = PathComparer {
@@ -585,7 +582,6 @@ mod test {
 
     #[test]
     fn ip_comparer() {
-        //crate::logging::init(true)?;
         for mut c in cases_from(IP_TEST_CASES) {
             println!("# ip - {}", c.name);
             let ic = IpComparer;
@@ -596,7 +592,6 @@ mod test {
 
     #[test]
     fn network_comparer() {
-        //crate::logging::init(true)?;
         for mut c in cases_from(NETWORK_TEST_CASES) {
             println!("# network - {}", c.name);
             let nc = NetworkComparer;

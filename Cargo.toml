@@ -29,6 +29,7 @@ typed-path = "0.6.0"
 [dev-dependencies]
 tempfile = "3.10.0"
 test-case = "3.3.1"
+test-log = "0.2.16"
 
 # workaround for https://github.com/cross-rs/cross/issues/1345
 [package.metadata.cross.target.x86_64-unknown-netbsd]

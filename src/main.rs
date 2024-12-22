@@ -457,6 +457,7 @@ mod test {
         path::PathBuf,
     };
     use tempfile::tempdir;
+    use test_log::test;
 
     const WITH_COMMENTS: &str = r"
 foo
