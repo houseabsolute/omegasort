@@ -29,6 +29,7 @@ const MAX_TERM_WIDTH: usize = 100;
 #[command(author, version, about)]
 #[clap(max_term_width = MAX_TERM_WIDTH)]
 #[clap(after_long_help = long_help())]
+#[allow(clippy::struct_excessive_bools)]
 struct Cli {
     /// The type of sorting to use.
     #[arg(short, long, value_enum)]
@@ -80,13 +81,14 @@ struct Cli {
 fn main() {
     let status = match Cli::new_from_args(args_os()) {
         Ok(cli) => cli.run(),
-        Err(e) => match e.downcast_ref::<clap::Error>() {
-            Some(e) => e.exit(),
-            _ => {
+        Err(e) => {
+            if let Some(e) = e.downcast_ref::<clap::Error>() {
+                e.exit()
+            } else {
                 error!("{e}");
                 42
             }
-        },
+        }
     };
     std::process::exit(status);
 }
@@ -159,7 +161,7 @@ impl Cli {
         T: Into<OsString> + Clone,
     {
         let command = Cli::command();
-        Cli::from_arg_matches(&command.get_matches_from(args)).map_err(|e| e.into())
+        Cli::from_arg_matches(&command.get_matches_from(args)).map_err(std::convert::Into::into)
     }
 
     fn run(&self) -> i32 {
@@ -176,8 +178,11 @@ impl Cli {
         if let Err(e) = self.execute() {
             error!("{}", e);
             let status = match e.downcast::<CheckError>() {
-                Ok(CheckError::HasUnexpectedEmptyLines { .. } | CheckError::NotSorted { .. })
-                | Ok(CheckError::NotUnique { .. }) => 1,
+                Ok(
+                    CheckError::HasUnexpectedEmptyLines { .. }
+                    | CheckError::NotSorted { .. }
+                    | CheckError::NotUnique { .. },
+                ) => 1,
                 _ => 2,
             };
             return status;
@@ -228,7 +233,7 @@ impl Cli {
             }
         }
 
-        self.sort_lines(lines, has_empty_lines, line_ending, sorter)
+        self.sort_lines(lines, has_empty_lines, line_ending, &sorter)
     }
 
     fn sort_lines(
@@ -236,7 +241,7 @@ impl Cli {
         lines: Vec<SortableLine>,
         has_empty_lines: bool,
         line_ending: &'static str,
-        sorter: Sorter,
+        sorter: &Sorter,
     ) -> Result<()> {
         let orig_hash = if has_empty_lines {
             None
@@ -260,8 +265,7 @@ impl Cli {
             let mut bak_file = self.file.clone();
             let ext = bak_file
                 .extension()
-                .map(|e| e.to_str().unwrap_or(""))
-                .unwrap_or("");
+                .map_or("", |e| e.to_str().unwrap_or(""));
             bak_file.set_extension(if ext.is_empty() {
                 String::from("bak")
             } else {
@@ -341,15 +345,14 @@ fn lines_from_reader<R: Read>(
         }
 
         if comment_prefix.is_some() && line.trim().starts_with(comment_prefix.unwrap()) {
-            match comment {
-                Some(ref mut comment) => comment.lines.push(line),
-                None => {
-                    comment = Some(Comment {
-                        lines: vec![line],
-                        is_preceded_by_empty_line: last_line_was_empty,
-                    });
-                    last_line_was_empty = false;
-                }
+            if let Some(ref mut comment) = comment {
+                comment.lines.push(line);
+            } else {
+                comment = Some(Comment {
+                    lines: vec![line],
+                    is_preceded_by_empty_line: last_line_was_empty,
+                });
+                last_line_was_empty = false;
             }
             continue;
         }
@@ -455,7 +458,7 @@ mod test {
     };
     use tempfile::tempdir;
 
-    const WITH_COMMENTS: &str = r#"
+    const WITH_COMMENTS: &str = r"
 foo
 bar
 # comment 1
@@ -463,9 +466,9 @@ baz
 
 # comment 2
 quux
-"#;
+";
 
-    const WITH_REPEATED_LINES: &str = r#"
+    const WITH_REPEATED_LINES: &str = r"
 # first foo
 foo
 bar
@@ -479,7 +482,7 @@ quux
 
 # second baz
 baz
-"#;
+";
 
     #[test]
     fn lines_from_reader() -> Result<()> {
@@ -697,14 +700,7 @@ baz
         Ok(())
     }
 
-    // This test fails on mip64 Linux for some reason. The error is:
-    //
-    //    thread 'test::do_not_rewrite_sorted_file' panicked at 'assertion failed: tv_nsec >= 0 && tv_nsec < NSEC_PER_SEC as i64', library/std/src/sys/unix/time.rs:77:9
     #[test]
-    #[cfg(not(all(
-        target_os = "linux",
-        any(target_arch = "mips64", target_arch = "mips64el")
-    )))]
     fn do_not_rewrite_sorted_file() -> Result<()> {
         let td = tempdir()?;
         let mut filename = td.path().to_path_buf();

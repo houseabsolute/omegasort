@@ -93,10 +93,14 @@ impl Comparer for NumberedTextComparer {
                 let f2 = num2.parse::<f64>();
                 debug!(
                     "  Parsed numbers as: `{}` <=> `{}`",
-                    f1.as_ref()
-                        .map_or_else(|e| e.to_string(), |r| r.to_string()),
-                    f2.as_ref()
-                        .map_or_else(|e| e.to_string(), |r| r.to_string()),
+                    f1.as_ref().map_or_else(
+                        std::string::ToString::to_string,
+                        std::string::ToString::to_string
+                    ),
+                    f2.as_ref().map_or_else(
+                        std::string::ToString::to_string,
+                        std::string::ToString::to_string
+                    ),
                 );
 
                 match (f1, f2) {
@@ -236,10 +240,10 @@ pub(crate) struct PathComparer {
 
 impl Comparer for PathComparer {
     fn cmp(&self, str1: &str, str2: &str) -> Result<Ordering> {
-        match self.path_type {
+        Ok(match self.path_type {
             PathType::Unix => self.cmp_unix(str1, str2),
             PathType::Windows => self.cmp_windows(str1, str2),
-        }
+        })
     }
 }
 
@@ -256,27 +260,27 @@ impl PathComparer {
         }
     }
 
-    fn cmp_unix(&self, str1: &str, str2: &str) -> Result<Ordering> {
+    fn cmp_unix(&self, str1: &str, str2: &str) -> Ordering {
         debug!("PathComparer comparing paths as Unix paths: `{str1}` <=> `{str2}`");
 
         let path1 = Utf8UnixPath::new(str1);
         let path2 = Utf8UnixPath::new(str2);
 
-        if let Some(o) = self.cmp_absolute(path1, path2) {
-            return Ok(o);
+        if let Some(o) = Self::cmp_absolute(path1, path2) {
+            return o;
         }
 
-        Ok(self.cmp_components(path1, path2))
+        self.cmp_components(path1, path2)
     }
 
-    fn cmp_windows(&self, str1: &str, str2: &str) -> Result<Ordering> {
+    fn cmp_windows(&self, str1: &str, str2: &str) -> Ordering {
         debug!("PathComparer comparing paths as Windows paths: `{str1}` <=> `{str2}`");
 
         let path1 = Utf8WindowsPath::new(str1);
         let path2 = Utf8WindowsPath::new(str2);
 
-        if let Some(o) = self.cmp_absolute(path1, path2) {
-            return Ok(o);
+        if let Some(o) = Self::cmp_absolute(path1, path2) {
+            return o;
         }
 
         // We end up calling `components()` again in `cmp_components` but when
@@ -296,26 +300,26 @@ impl PathComparer {
                     pre2.as_str(),
                 );
                 if pre1 != pre2 {
-                    return Ok(pre1.cmp(&pre2));
+                    return pre1.cmp(&pre2);
                 }
             }
             (Some(Utf8WindowsComponent::Prefix(_)), _) => {
                 debug!("  only the left side starts with a Windows prefix");
-                return Ok(Ordering::Less);
+                return Ordering::Less;
             }
             (_, Some(Utf8WindowsComponent::Prefix(_))) => {
                 debug!("  only the right side starts with a Windows prefix");
-                return Ok(Ordering::Greater);
+                return Ordering::Greater;
             }
             _ => {
                 debug!("  neither side starts with a Windows prefix");
             }
         }
 
-        Ok(self.cmp_components(path1, path2))
+        self.cmp_components(path1, path2)
     }
 
-    fn cmp_absolute<T>(&self, path1: &Utf8Path<T>, path2: &Utf8Path<T>) -> Option<Ordering>
+    fn cmp_absolute<T>(path1: &Utf8Path<T>, path2: &Utf8Path<T>) -> Option<Ordering>
     where
         T: for<'enc> Utf8Encoding<'enc>,
     {
@@ -494,18 +498,18 @@ mod test {
         PathComparer, PathType, TextComparer,
     };
     use crate::collation::collator_for_locale;
-    use anyhow::Result;
 
     struct Case {
         name: &'static str,
         input: Vec<&'static str>,
         expect: Vec<&'static str>,
+        #[allow(clippy::struct_field_names)]
         case_insensitive: bool,
         locale: Option<&'static str>,
     }
 
     #[test]
-    fn text_comparer() -> Result<()> {
+    fn text_comparer() {
         //crate::logging::init(true)?;
         for mut c in cases_from(TEXT_TEST_CASES) {
             println!("# text - {}", c.name);
@@ -518,12 +522,10 @@ mod test {
             c.input.sort_by(|a, b| tc.cmp(a, b).unwrap());
             assert_eq!(c.input, c.expect);
         }
-
-        Ok(())
     }
 
     #[test]
-    fn numbered_text_comparer() -> Result<()> {
+    fn numbered_text_comparer() {
         //crate::logging::init(true)?;
         for mut c in cases_from(TEXT_TEST_CASES)
             .into_iter()
@@ -539,12 +541,10 @@ mod test {
             c.input.sort_by(|a, b| ntc.cmp(a, b).unwrap());
             assert_eq!(c.input, c.expect);
         }
-
-        Ok(())
     }
 
     #[test]
-    fn datetime_text_comparer() -> Result<()> {
+    fn datetime_text_comparer() {
         //crate::logging::init(true)?;
         for mut c in cases_from(TEXT_TEST_CASES)
             .into_iter()
@@ -560,12 +560,10 @@ mod test {
             c.input.sort_by(|a, b| dtc.cmp(a, b).unwrap());
             assert_eq!(c.input, c.expect);
         }
-
-        Ok(())
     }
 
     #[test]
-    fn path_comparer() -> Result<()> {
+    fn path_comparer() {
         //crate::logging::init(true)?;
         for mut c in cases_from(PATH_TEST_CASES) {
             println!("# path - {}", c.name);
@@ -583,12 +581,10 @@ mod test {
             c.input.sort_by(|a, b| pc.cmp(a, b).unwrap());
             assert_eq!(c.input, c.expect);
         }
-
-        Ok(())
     }
 
     #[test]
-    fn ip_comparer() -> Result<()> {
+    fn ip_comparer() {
         //crate::logging::init(true)?;
         for mut c in cases_from(IP_TEST_CASES) {
             println!("# ip - {}", c.name);
@@ -596,12 +592,10 @@ mod test {
             c.input.sort_by(|a, b| ic.cmp(a, b).unwrap());
             assert_eq!(c.input, c.expect);
         }
-
-        Ok(())
     }
 
     #[test]
-    fn network_comparer() -> Result<()> {
+    fn network_comparer() {
         //crate::logging::init(true)?;
         for mut c in cases_from(NETWORK_TEST_CASES) {
             println!("# network - {}", c.name);
@@ -609,8 +603,6 @@ mod test {
             c.input.sort_by(|a, b| nc.cmp(a, b).unwrap());
             assert_eq!(c.input, c.expect);
         }
-
-        Ok(())
     }
 
     fn cases_from(cases_text: &'static str) -> Vec<Case> {
@@ -619,14 +611,14 @@ mod test {
             .map(|case| {
                 let mut elts = case.split("----\n");
                 let name = elts.next().unwrap().trim();
-                let input = elts.next().unwrap().trim().split('\n').collect();
-                let expect = elts.next().unwrap().trim().split('\n').collect();
+                let input = elts.next().unwrap().lines().collect();
+                let expect = elts.next().unwrap().lines().collect();
                 let case_insensitive = match elts.next() {
                     Some("false\n") | None => false,
                     Some("true\n") => true,
                     Some(ci) => panic!("unknown case-insensitive value: {ci}"),
                 };
-                let locale = elts.next().map(|l| l.trim());
+                let locale = elts.next().map(str::trim);
                 Case {
                     name,
                     input,
@@ -638,7 +630,7 @@ mod test {
             .collect()
     }
 
-    const TEXT_TEST_CASES: &str = r#"
+    const TEXT_TEST_CASES: &str = r"
 ASCII with no locale
 ----
 go
@@ -722,9 +714,9 @@ zoo
 false
 ----
 sv-SE
-"#;
+";
 
-    const NUMBERED_TEXT_TEST_CASES: &str = r#"
+    const NUMBERED_TEXT_TEST_CASES: &str = r"
 numbered ASCII with no locale
 ----
 120001 go
@@ -824,9 +816,9 @@ numbered text with decimal numbers
 27.2314 - bar
 ----
 false
-"#;
+";
 
-    const DATETIME_TEXT_TEST_CASES: &str = r#"
+    const DATETIME_TEXT_TEST_CASES: &str = r"
 datetime ASCII text with no locale
 ----
 2017-1-12 hello
@@ -912,7 +904,7 @@ datetime and dates
 2017-1-12T14:01:01
 ----
 false
-"#;
+";
 
     const PATH_TEST_CASES: &str = r"
 path with ASCII text
@@ -1044,7 +1036,7 @@ false
 sv-SE
 ";
 
-    const IP_TEST_CASES: &str = r#"
+    const IP_TEST_CASES: &str = r"
 ip with just IPv4
 ----
 1.1.1.1
@@ -1086,9 +1078,9 @@ ip with mixed IPv4 and IPv6
 ::1234
 1234::
 9876::fe01:1234:457f
-"#;
+";
 
-    const NETWORK_TEST_CASES: &str = r#"
+    const NETWORK_TEST_CASES: &str = r"
 network with just IPv4
 ----
 1.1.1.1/32
@@ -1136,5 +1128,5 @@ network with mixed IPv4 and IPv6
 ::1/128
 1234::/90
 9876::fe01:1234:0/24
-"#;
+";
 }

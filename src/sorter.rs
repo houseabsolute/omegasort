@@ -23,11 +23,11 @@ pub(crate) enum Strategy {
 }
 
 impl Strategy {
-    pub(crate) fn supports_locale(&self) -> bool {
+    pub(crate) fn supports_locale(self) -> bool {
         !matches!(self, Strategy::Ip | Strategy::Network)
     }
 
-    pub(crate) fn supports_path_type(&self) -> bool {
+    pub(crate) fn supports_path_type(self) -> bool {
         matches!(self, Strategy::Path)
     }
 }
@@ -39,6 +39,7 @@ pub(crate) struct Sorter {
 }
 
 impl Sorter {
+    #[allow(clippy::fn_params_excessive_bools)]
     pub(crate) fn new(
         strategy: Strategy,
         locale_name: Option<&str>,
@@ -163,18 +164,18 @@ mod test {
             .map(|l| (l.0 + 1, l.1))
             .map(SortableLine::from_number_and_str)
             .collect::<Vec<_>>();
-        let sorted = sorter.sort_lines(lines.clone())?;
+        let sorted_lines = sorter.sort_lines(lines.clone())?;
 
         let mut expect = [(2, "bar"), (4, "baz"), (1, "foo"), (3, "quux")]
             .into_iter()
             .map(SortableLine::from_number_and_str)
             .collect::<Vec<_>>();
-        assert_eq!(sorted, expect, "got expected ascending sorting");
+        assert_eq!(sorted_lines, expect, "got expected ascending sorting");
 
         let sorter = Sorter::new(Strategy::Text, None, false, false, true, false)?;
-        let sorted = sorter.sort_lines(lines)?;
+        let sorted_lines = sorter.sort_lines(lines)?;
         expect.reverse();
-        assert_eq!(sorted, expect, "got expected descending sorting");
+        assert_eq!(sorted_lines, expect, "got expected descending sorting");
 
         Ok(())
     }
