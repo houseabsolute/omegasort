@@ -21,48 +21,48 @@ jobs:
       matrix:
         platform:
           - os-name: FreeBSD-x86_64
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
             target: x86_64-unknown-freebsd
             name: omegasort-FreeBSD-x86_64.tar.gz
             skip-tests: true
           - os-name: Linux-x86_64
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
             target: x86_64-unknown-linux-musl
             name: omegasort-Linux-x86_64-musl.tar.gz
           - os-name: Linux-aarch64
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
             target: aarch64-unknown-linux-musl
             name: omegasort-Linux-aarch64-musl.tar.gz
           - os-name: Linux-arm
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
             target: arm-unknown-linux-musleabi
             name: omegasort-Linux-arm-musl.tar.gz
           - os-name: Linux-i686
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
             target: i686-unknown-linux-musl
             name: omegasort-Linux-i686-musl.tar.gz
           - os-name: Linux-powerpc
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
             target: powerpc-unknown-linux-gnu
             name: omegasort-Linux-powerpc-gnu.tar.gz
           - os-name: Linux-powerpc64
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
             target: powerpc64-unknown-linux-gnu
             name: omegasort-Linux-powerpc64-gnu.tar.gz
           - os-name: Linux-powerpc64le
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
             target: powerpc64le-unknown-linux-gnu
             name: omegasort-Linux-powerpc64le.tar.gz
           - os-name: Linux-riscv64
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
             target: riscv64gc-unknown-linux-gnu
             name: omegasort-Linux-riscv64gc-gnu.tar.gz
           - os-name: Linux-s390x
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
             target: s390x-unknown-linux-gnu
             name: omegasort-Linux-s390x-gnu.tar.gz
           - os-name: NetBSD-x86_64
-            runs-on: ubuntu-20.04
+            runs-on: ubuntu-24.04
             target: x86_64-unknown-netbsd
             name: omegasort-NetBSD-x86_64.tar.gz
             skip-tests: true
@@ -92,12 +92,12 @@ jobs:
         include:
           - platform:
               os-name: Linux-x86_64
-              runs-on: ubuntu-20.04
+              runs-on: ubuntu-24.04
               target: x86_64-unknown-linux-musl
             toolchain: beta
           - platform:
               os-name: Linux-x86_64
-              runs-on: ubuntu-20.04
+              runs-on: ubuntu-24.04
               target: x86_64-unknown-linux-musl
             toolchain: nightly
     steps:
