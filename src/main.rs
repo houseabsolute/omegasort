@@ -179,7 +179,7 @@ impl Cli {
             error!("{}", e);
             let status = match e.downcast::<CheckError>() {
                 Ok(
-                    CheckError::HasUnexpectedEmptyLines { .. }
+                    CheckError::HasUnexpectedEmptyLines
                     | CheckError::NotSorted { .. }
                     | CheckError::NotUnique { .. },
                 ) => 1,
@@ -792,7 +792,7 @@ baz
         let check_error = dc.unwrap();
         match expected_check_failure {
             "HasUnexpectedEmptyLines" => assert!(
-                matches!(check_error, CheckError::HasUnexpectedEmptyLines { .. }),
+                matches!(check_error, CheckError::HasUnexpectedEmptyLines),
                 "check_error ({check_error:?}) is a HasUnexpectedEmptyLines error"
             ),
             "NotSorted" => assert!(
