@@ -11,25 +11,25 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.95"
-chrono = "0.4.39"
-clap = { version = "4.5.23", features = ["derive", "wrap_help"] }
+anyhow = "1.0.97"
+chrono = "0.4.40"
+clap = { version = "4.5.35", features = ["derive", "wrap_help"] }
 dateparser = "0.2.1"
 fern = { version = "0.7.1", features = ["colored"] }
 icu = { version = "1.5.0", features = ["sync"] }
-ipnet = "2.10.1"
-lazy-regex = "3.3.0"
-log = "0.4.22"
+ipnet = "2.11.0"
+lazy-regex = "3.4.1"
+log = "0.4.27"
 rayon = "1.10.0"
-tempfile = "3.14.0"
-termimad = "0.31.1"
-thiserror = "2.0.9"
+tempfile = "3.19.1"
+termimad = "0.31.2"
+thiserror = "2.0.12"
 typed-path = "0.10.0"
 
 [dev-dependencies]
-tempfile = "3.14.0"
+tempfile = "3.19.1"
 test-case = "3.3.1"
-test-log = "0.2.16"
+test-log = "0.2.17"
 
 # workaround for https://github.com/cross-rs/cross/issues/1345
 [package.metadata.cross.target.x86_64-unknown-netbsd]
