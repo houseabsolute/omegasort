@@ -166,17 +166,17 @@ impl Cli {
 
     fn run(&self) -> i32 {
         if let Err(e) = logging::init(self.debug) {
-            error!("{}", e);
+            error!("{e}");
             return 100;
         }
 
         if let Err(e) = self.validate_args() {
-            error!("{}", e);
+            error!("{e}");
             return 101;
         }
 
         if let Err(e) = self.execute() {
-            error!("{}", e);
+            error!("{e}");
             let status = match e.downcast::<CheckError>() {
                 Ok(
                     CheckError::HasUnexpectedEmptyLines
