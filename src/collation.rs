@@ -1,8 +1,6 @@
 use anyhow::{anyhow, Result};
-use icu::{
-    collator::{Collator, CollatorOptions, Strength},
-    locid::Locale,
-};
+use icu_collator::{Collator, CollatorOptions, Strength};
+use icu_locid::Locale;
 use log::debug;
 
 pub(crate) fn collator_for_locale(locale_name: &str, case_insensitive: bool) -> Result<Collator> {

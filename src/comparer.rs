@@ -1,7 +1,7 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use dateparser::DateTimeUtc;
-use icu::collator::Collator;
+use icu_collator::Collator;
 use ipnet::IpNet;
 use lazy_regex::regex;
 use log::debug;
