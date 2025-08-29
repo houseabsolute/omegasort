@@ -448,7 +448,7 @@ fn compare_two_strings(
     str2: &str,
 ) -> Ordering {
     if let Some(c) = collator {
-        let ord = c.compare(str1, str2);
+        let ord = c.as_borrowed().compare(str1, str2);
         if ord != Ordering::Equal {
             return ord;
         }
