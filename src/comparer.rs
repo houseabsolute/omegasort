@@ -321,7 +321,7 @@ impl PathComparer {
 
     fn cmp_absolute<T>(path1: &Utf8Path<T>, path2: &Utf8Path<T>) -> Option<Ordering>
     where
-        T: for<'enc> Utf8Encoding<'enc>,
+        T: Utf8Encoding,
     {
         let path1_is_abs = path1.is_absolute();
         let path2_is_abs = path2.is_absolute();
@@ -338,7 +338,7 @@ impl PathComparer {
 
     fn cmp_components<T>(&self, path1: &Utf8Path<T>, path2: &Utf8Path<T>) -> Ordering
     where
-        T: for<'enc> Utf8Encoding<'enc>,
+        T: Utf8Encoding,
     {
         let elems1 = path1.components().collect::<Vec<_>>();
         let elems2 = path2.components().collect::<Vec<_>>();
