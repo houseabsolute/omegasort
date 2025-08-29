@@ -415,7 +415,7 @@ const LINE_ENDINGS: [&str; 3] = ["\r\n", "\n", "\r"];
 
 type LineEndingChain<'a> = (Chain<Cursor<Vec<u8>>, &'a mut File>, &'static str);
 
-fn determine_line_ending(file: &mut File) -> Result<LineEndingChain> {
+fn determine_line_ending(file: &mut File) -> Result<LineEndingChain<'_>> {
     let mut buf = [0; FIRST_CHUNK_SIZE];
     let read = file.read(&mut buf)?;
 
