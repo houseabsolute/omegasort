@@ -90,7 +90,7 @@ impl Sorter {
 
         for line in lines {
             if let Some(last_line) = last_line {
-                if self.is_ordered(last_line, &line.line)? {
+                if !self.is_ordered(last_line, &line.line)? {
                     return Err(CheckError::NotSorted {
                         first: last_line.to_string(),
                         second: line.line.clone(),

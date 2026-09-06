@@ -14,7 +14,7 @@ use typed_path::{
 pub(crate) trait Comparer {
     fn is_ordered(&self, str1: &str, str2: &str, reverse: bool) -> Result<bool> {
         let ord = self.cmp(str1, str2)?;
-        Ok(if reverse { !ord.is_gt() } else { ord.is_gt() })
+        Ok(if reverse { ord.is_ge() } else { ord.is_le() })
     }
 
     fn cmp(&self, str1: &str, str2: &str) -> Result<Ordering>;
@@ -507,6 +507,47 @@ mod test {
         #[allow(clippy::struct_field_names)]
         case_insensitive: bool,
         locale: Option<&'static str>,
+    }
+
+    #[test]
+    fn is_ordered_only_flags_a_real_violation() {
+        let tc = TextComparer {
+            collator: None,
+            case_insensitive: false,
+        };
+
+        for (first, second, reverse, expect, why) in [
+            (
+                "b",
+                "a",
+                false,
+                false,
+                "b before a is out of order going up",
+            ),
+            ("a", "b", false, true, "a before b is in order going up"),
+            (
+                "a",
+                "b",
+                true,
+                false,
+                "a before b is out of order going down",
+            ),
+            ("b", "a", true, true, "b before a is in order going down"),
+            ("a", "a", false, true, "equal lines are in order going up"),
+            (
+                "a",
+                "a",
+                true,
+                true,
+                "equal lines are in order going down too",
+            ),
+        ] {
+            assert_eq!(
+                tc.is_ordered(first, second, reverse).unwrap(),
+                expect,
+                "{why}",
+            );
+        }
     }
 
     #[test]

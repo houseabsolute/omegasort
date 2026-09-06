@@ -1,3 +1,8 @@
+## Unreleased
+
+- Running `--check` with `--reverse` would incorrectly report a file as unsorted when it had two
+  identical lines.
+
 ## 0.1.3 - 2023-11-04
 
 - When sorting a file with repeated lines with a `--locale`, the sorting order was not always
