@@ -8,7 +8,7 @@ mod logging;
 mod sorter;
 
 use crate::{error::CheckError, gitignore::Grouper};
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::{CommandFactory, FromArgMatches, Parser};
 use log::{debug, error};
 use sorter::{Sorter, Strategy};
@@ -492,9 +492,16 @@ fn first_line_written(lines: &[SortableLine]) -> &str {
 
 const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
 
-const FIRST_CHUNK_SIZE: usize = 2048;
+/// How much we read at a time while looking for the file's line ending. This is only a read size,
+/// not a limit on how far we look.
+const READ_CHUNK_SIZE: usize = 2048;
 
 const LINE_ENDINGS: [&str; 3] = ["\r\n", "\n", "\r"];
+
+/// What we use for a file that has no line ending of its own. Such a file holds at most one line,
+/// so there is nothing in it to reorder and it is never rewritten in place. This only reaches a
+/// file with `--stdout`.
+const DEFAULT_LINE_ENDING: &str = "\n";
 
 /// A reader for the whole file, plus what reading its first bytes settled.
 struct LineEndingChain<'a> {
@@ -512,40 +519,78 @@ struct LineEndingChain<'a> {
 /// BOM. We take it off here and `write_lines_to_writer` puts it back, which keeps it at the front
 /// of the file however the lines are reordered.
 fn determine_line_ending(file: &mut File) -> Result<LineEndingChain<'_>> {
-    let mut buf = [0; FIRST_CHUNK_SIZE];
-    let read = file.read(&mut buf)?;
+    let mut buf = vec![];
+    let mut chunk = [0; READ_CHUNK_SIZE];
+    let mut line_ending = DEFAULT_LINE_ENDING;
+    let longest_line_ending = LINE_ENDINGS.iter().map(|le| le.len()).max().unwrap();
+    // Where the next search starts. Everything before it has been searched already, so only what a
+    // new read brings in is looked at again. The one byte of overlap is there because the longest
+    // line ending is two bytes, so a `\r\n` split across two reads still has its `\r` in the
+    // window.
+    let mut search_from = 0;
 
-    let has_bom = buf[0..read].starts_with(&UTF8_BOM);
-    let start = if has_bom { UTF8_BOM.len() } else { 0 };
+    loop {
+        let read = file.read(&mut chunk)?;
+        let at_eof = read == 0;
+        buf.extend_from_slice(&chunk[..read]);
 
+        if let Some(le) = line_ending_in(&buf, search_from, at_eof) {
+            line_ending = le;
+            break;
+        }
+        if at_eof {
+            break;
+        }
+        search_from = buf.len().saturating_sub(longest_line_ending - 1);
+    }
+
+    let has_bom = buf.starts_with(&UTF8_BOM);
+    if has_bom {
+        buf.drain(..UTF8_BOM.len());
+    }
+
+    Ok(LineEndingChain {
+        reader: Cursor::new(buf).chain(file),
+        line_ending,
+        has_bom,
+    })
+}
+
+/// The first of `LINE_ENDINGS` that appears in `buf`, or `None` when we cannot answer from what we
+/// have read so far.
+///
+/// The order matters. A file that ends its lines with `\r\n` also contains `\n`, and one that ends
+/// them with either also contains bytes we would call a lone `\r` if we looked for that first. Lone
+/// `\r` comes last because it is the guess that does the most damage when it is wrong: reading
+/// splits lines on `\n` alone, so joining a file back together with `\r` would run every line into
+/// one.
+///
+/// A lone `\r` at the very end of the buffer is not an answer yet, because the next byte we have
+/// not read may be a `\n` that makes it a `\r\n`.
+///
+/// Only `buf[search_from..]` is searched. Skipping the rest is safe because the caller only moves
+/// `search_from` forward over bytes that have already been searched without an answer, and it
+/// leaves enough overlap for a line ending that straddles two reads.
+fn line_ending_in(buf: &[u8], search_from: usize, at_eof: bool) -> Option<&'static str> {
     for le in LINE_ENDINGS {
-        if buf_contains_str(le, &buf) {
-            return Ok(LineEndingChain {
-                reader: Cursor::new(Vec::from(&buf[start..read])).chain(file),
-                line_ending: le,
-                has_bom,
-            });
+        let Some(pos) = buf_find_str(le, &buf[search_from..]) else {
+            continue;
+        };
+        if le == "\r" && !at_eof && pos + search_from == buf.len() - 1 {
+            return None;
         }
+        return Some(le);
     }
-
-    Err(could_not_determine_line_ending())
+    None
 }
 
-fn could_not_determine_line_ending() -> Error {
-    anyhow!("could not determine line ending from first {FIRST_CHUNK_SIZE} bytes of file")
-}
-
-fn buf_contains_str(needle: &str, haystack: &[u8]) -> bool {
+fn buf_find_str(needle: &str, haystack: &[u8]) -> Option<usize> {
+    let needle = needle.as_bytes();
     if needle.len() == 1 {
-        return haystack.contains(&needle.as_bytes()[0]);
+        return haystack.iter().position(|b| *b == needle[0]);
     }
 
-    for w in haystack.windows(needle.len()) {
-        if w == needle.as_bytes() {
-            return true;
-        }
-    }
-    false
+    haystack.windows(needle.len()).position(|w| w == needle)
 }
 
 #[cfg(test)]
@@ -839,44 +884,73 @@ baz
     fn determine_line_ending() -> Result<()> {
         let mut long_str = "Lorem ipsum dolor sit amet".repeat(100);
         long_str.push('\n');
+
+        // A `\r` sitting on the last byte of a read cannot be judged until the byte after it has
+        // been read too, so these two put one exactly there.
+        let mut crlf_across_reads = "x".repeat(super::READ_CHUNK_SIZE - 1);
+        crlf_across_reads.push_str("\r\nconsectetur adipiscing elit\r\n");
+        let mut cr_across_reads = "x".repeat(super::READ_CHUNK_SIZE - 1);
+        cr_across_reads.push_str("\rconsectetur adipiscing elit\r");
+
+        // A BOM sits at the front of the file and the line ending is only found on the second read,
+        // so the two have to survive each other.
+        let mut bom_across_reads = String::from("\u{feff}");
+        bom_across_reads.push_str(&"x".repeat(super::READ_CHUNK_SIZE));
+        bom_across_reads.push('\n');
+
+        // The file is exactly one read long and ends with a `\r`, so it takes the read that returns
+        // nothing to settle what that `\r` is.
+        let mut cr_at_end_of_file = String::from("b");
+        cr_at_end_of_file.push_str(&"x".repeat(super::READ_CHUNK_SIZE - 2));
+        cr_at_end_of_file.push('\r');
+
         // The third element is whether the file starts with a BOM, which `determine_line_ending`
         // reports so that it can be written back later.
-        let tests: &[(&str, Result<&str>, bool)] = &[
+        let tests: &[(&str, &str, bool)] = &[
             (
                 "Lorem ipsum dolor sit amet\nconsectetur adipiscing elit",
-                Ok("\n"),
+                "\n",
                 false,
             ),
             (
                 "Lorem ipsum dolor sit amet\rconsectetur adipiscing elit",
-                Ok("\r"),
+                "\r",
                 false,
             ),
             (
                 "Lorem ipsum dolor sit amet\r\nconsectetur adipiscing elit",
-                Ok("\r\n"),
+                "\r\n",
                 false,
             ),
             (
                 "\u{feff}Lorem ipsum dolor sit amet\nconsectetur adipiscing elit",
-                Ok("\n"),
+                "\n",
                 true,
             ),
             (
                 "Lorem ipsum\u{feff} dolor sit amet\nconsectetur adipiscing elit",
-                Ok("\n"),
+                "\n",
                 false,
             ),
+            // A file with no line ending at all holds one line, so there is nothing to reorder in
+            // it and nothing to work out. We say `\n` and carry on rather than refusing to sort it.
             (
                 "Lorem ipsum dolor sit amet\tconsectetur adipiscing elit",
-                Err(super::could_not_determine_line_ending()),
+                "\n",
                 false,
             ),
-            (
-                long_str.as_str(),
-                Err(super::could_not_determine_line_ending()),
-                false,
-            ),
+            // A stray `\r` inside a line does not make this a `\r`-terminated file. Joining it back
+            // together with `\r` would run every line into one, so `\n` has to win.
+            ("a\rb\nc\n", "\n", false),
+            ("", "\n", false),
+            ("\u{feff}", "\n", true),
+            // The line ending can sit past the first read. We keep reading until we find one
+            // instead of giving up.
+            (long_str.as_str(), "\n", false),
+            (crlf_across_reads.as_str(), "\r\n", false),
+            (cr_across_reads.as_str(), "\r", false),
+            (bom_across_reads.as_str(), "\n", true),
+            (cr_at_end_of_file.as_str(), "\r", false),
         ];
 
         for t in tests {
@@ -889,30 +963,21 @@ baz
             drop(file);
 
             let mut file = File::open(&filename)?;
-            let res = super::determine_line_ending(&mut file);
-            if let Ok(expect) = t.1 {
-                let LineEndingChain {
-                    mut reader,
-                    line_ending,
-                    has_bom,
-                } = res?;
-                assert_eq!(line_ending, expect, "line ending for {:?}", t.0);
-                assert_eq!(has_bom, t.2, "BOM for {:?}", t.0);
+            let LineEndingChain {
+                mut reader,
+                line_ending,
+                has_bom,
+            } = super::determine_line_ending(&mut file)?;
+            assert_eq!(line_ending, t.1, "line ending for {:?}", t.0);
+            assert_eq!(has_bom, t.2, "BOM for {:?}", t.0);
 
-                let mut rest = String::new();
-                reader.read_to_string(&mut rest)?;
-                assert_eq!(
-                    rest,
-                    t.0.strip_prefix('\u{feff}').unwrap_or(t.0),
-                    "the reader hands back the file with any leading BOM taken off",
-                );
-            } else {
-                assert!(res.is_err());
-                assert_eq!(
-                    res.map(|c| c.line_ending).unwrap_err().to_string(),
-                    t.1.as_ref().unwrap_err().to_string(),
-                );
-            }
+            let mut rest = String::new();
+            reader.read_to_string(&mut rest)?;
+            assert_eq!(
+                rest,
+                t.0.strip_prefix('\u{feff}').unwrap_or(t.0),
+                "the reader hands back the file with any leading BOM taken off",
+            );
         }
 
         Ok(())
@@ -1010,6 +1075,100 @@ baz
             "\u{feff}\u{feff}aaa\nzzz\n",
             "a collator can sort a BOM line to the front of a file that had no BOM, so this is \
              not only a gitignore problem. Without the extra BOM the line would lose its own.",
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn a_file_with_no_line_ending_is_not_an_error() -> Result<()> {
+        // A file with no line ending in it holds at most one line, so there is nothing in it to
+        // reorder. Sorting it used to fail outright because we could not work out what to end its
+        // lines with.
+        let run = |strategy: &str, extra: &[&str], content: &str| -> Result<String> {
+            let td = tempdir()?;
+            let mut filename = td.path().to_path_buf();
+            filename.push("input.txt");
+            write(&filename, content)?;
+
+            let mut args = vec![
+                String::from("omegasort"),
+                String::from("--sort"),
+                String::from(strategy),
+            ];
+            if !extra.contains(&"--check") {
+                args.push(String::from("--in-place"));
+            }
+            args.extend(extra.iter().map(|a| String::from(*a)));
+            args.push(filename.to_string_lossy().to_string());
+            Cli::new_from_args(args)?.execute()?;
+
+            Ok(read_to_string(filename)?)
+        };
+
+        for (strategy, extra) in [
+            ("text", &[][..]),
+            ("text", &["--check"][..]),
+            ("gitignore", &[][..]),
+            ("gitignore", &["--unique"][..]),
+        ] {
+            assert_eq!(
+                run(strategy, extra, "foo")?,
+                "foo",
+                "one line with no line ending after it is left alone by --sort {strategy} {extra:?}",
+            );
+            assert_eq!(
+                run(strategy, extra, "")?,
+                "",
+                "an empty file is left alone by --sort {strategy} {extra:?}",
+            );
+        }
+
+        // Writing is the one place the fallback line ending is visible, and `--stdout` is the only
+        // way to reach it, since a file that cannot be reordered is never rewritten.
+        let td = tempdir()?;
+        let mut filename = td.path().to_path_buf();
+        filename.push("input.txt");
+        write(&filename, "foo")?;
+        let contents = super::read_lines(&filename, Strategy::Text, None)?;
+        assert_eq!(contents.line_ending, "\n", "the fallback line ending");
+        let mut buf = vec![];
+        super::write_lines_to_writer(contents, &mut buf)?;
+        assert_eq!(
+            String::from_utf8(buf)?,
+            "foo\n",
+            "written out, the line gets a newline after it like every other line does",
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn a_crlf_file_is_not_mistaken_for_one_that_uses_a_lone_cr() -> Result<()> {
+        // The `\r` of this file's first `\r\n` is the last byte of the first read, so its `\n` is
+        // only seen on the next one. Calling that `\r` a line ending of its own would join every
+        // line back together with a `\r`, which most tools then read as a single line.
+        let long_line = "x".repeat(super::READ_CHUNK_SIZE - 1);
+        let content = format!("{long_line}\r\nzebra\r\napple\r\n");
+
+        let td = tempdir()?;
+        let mut filename = td.path().to_path_buf();
+        filename.push("input.txt");
+        write(&filename, &content)?;
+
+        Cli::new_from_args(vec![
+            String::from("omegasort"),
+            String::from("--sort"),
+            String::from("text"),
+            String::from("--in-place"),
+            filename.to_string_lossy().to_string(),
+        ])?
+        .execute()?;
+
+        assert_eq!(
+            read_to_string(&filename)?,
+            format!("apple\r\n{long_line}\r\nzebra\r\n"),
+            "the file keeps its CRLF line endings and its three lines",
         );
 
         Ok(())

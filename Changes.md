@@ -15,6 +15,10 @@
 - A BOM at the start of a file is no longer treated as part of its first line. Previously, this
   would be treated as file content and could be sorted onto a different line. Now, the BOM is
   excluded from sorting and left in place.
+- A file with CRLF line endings could be rewritten to only use `\r` when its 2048th byte was the
+  `\r` of a `\r\n`.
+- `omegasort` would refuse to sort an empty file or a single-line file with no trailing line ending.
+  Now it simply leaves such files as-is, since there's nothing to sort in these cases.
 
 ## 0.1.3 - 2023-11-04
 
