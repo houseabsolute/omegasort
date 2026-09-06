@@ -93,65 +93,45 @@ fn main() {
     std::process::exit(status);
 }
 
+/// The extended help for each sorting method is kept in `README.md` and pulled out of it here, so
+/// that the two cannot drift apart. The markers are HTML comments, so they do not show up when
+/// GitHub renders the file.
+const SORTING_METHODS_START: &str = "<!-- sorting-methods -->";
+const SORTING_METHODS_END: &str = "<!-- /sorting-methods -->";
+
 fn long_help() -> String {
-    const HELP: &str = r#"
-There are a number of different sorting methods available.
-
-## Text (`--sort text`)
-
-This sorts each line of the file as text without any special parsing. The exact sorting is determined by the `--locale`, `--case-insensitive`, and `--reverse` flags.
-
-## Numbered Text (`--sort numbered-text`)
-
-This assumes that each line of the file starts with a numeric value, optionally followed by non-numeric text.
-
-Lines should not have any leading space before the number. The number can either be an integer (including 0) or a simple float (no scientific notation).
-
-The lines will be sorted numerically first. If two lines have the same number they will be sorted by text as above.
-
-Lines without numbers always sort after lines with numbers.
-
-This sorting method accepts the `--locale`, `--case-insensitive`, and `--reverse` flags.
-
-## Datetime (`--sort datetime-text`)
-
-This sorting method assumes that each line starts with a date or datetime, without any space in it. That means that a string with both a date *and* a time needs to be in a format like "2019-08-27T19:13:16".
-
-Lines should not have any leading space before the datetime.
-
-This sorting method accepts the `--locale`, `--case-insensitive`, and `--reverse` flags.
-
-## Path (`--sort path`)
-
-Each line is treated as a path.
-
-The paths are sorted by the following rules:
-
-* Absolute paths come before relative.
-* Paths are sorted by depth before sorting by the path content, so /z comes before /a/a.
-* If you pass the `--windows` flag, then paths with drive letters or UNC names are sorted based on that prefix first. Paths with drive letters or UNC names sort before paths without them.
-
-This sorting method accepts the `--locale`, `--case-insensitive`, and `--reverse` flags in addition to the `--windows` flag.
-
-## IP (`--sort ip`)
-
-This method assumes that each line is an IPv4 or IPv6 address (not a network).
-
-The sorting method is the same as if each line were the corresponding integer for the address. IPv4 addresses always sort before IPv6 addresses.
-
-This sorting method accepts the `--reverse` flag.
-
-## Network (`--sort network`)
-
-This method assumes that each line is an IPv4 or IPv6 network in CIDR notation.
-
-If there are two networks with the same base address they are sorted with the larger network first (so 1.1.1.0/24 comes before 1.1.1.0/28). IPv4 networks always sort before IPv6 networks.
-
-This sorting method accepts the `--reverse` flag.
-"#;
+    const INTRO: &str = "There are a number of different sorting methods available.\n";
 
     let skin = MadSkin::default();
-    format!("{}", skin.text(HELP, Some(MAX_TERM_WIDTH)))
+    let help = format!("{INTRO}\n{}", sorting_methods_from_readme());
+    format!("{}", skin.text(&help, Some(MAX_TERM_WIDTH)))
+}
+
+/// Returns the part of `README.md` between the sorting-methods markers.
+fn sorting_methods_from_readme() -> String {
+    const README: &str = include_str!("../README.md");
+
+    sorting_methods_from(README)
+}
+
+/// Returns the part of `readme` between the sorting-methods markers.
+///
+/// The README is baked in at compile time, so this cannot fail at runtime for a reason the tests
+/// would not already have caught. A test checks that both markers are still there.
+///
+/// A Windows checkout can give the README `\r\n` line endings, so the start marker cannot include
+/// a line ending and the text that comes back is normalized to `\n`.
+fn sorting_methods_from(readme: &str) -> String {
+    let start = readme
+        .find(SORTING_METHODS_START)
+        .expect("README.md has a sorting-methods start marker")
+        + SORTING_METHODS_START.len();
+    let end = readme[start..]
+        .find(SORTING_METHODS_END)
+        .expect("README.md has a sorting-methods end marker")
+        + start;
+
+    readme[start..end].trim().replace("\r\n", "\n")
 }
 
 impl Cli {
@@ -484,6 +464,48 @@ quux
 # second baz
 baz
 ";
+
+    // The extended help is cut out of `README.md`, so a rename or a stray edit to either marker
+    // would quietly leave `--help` with no sorting methods in it at all.
+    #[test]
+    fn sorting_methods_come_from_the_readme() {
+        let methods = super::sorting_methods_from_readme();
+        assert!(
+            methods.starts_with("### Text (`--sort text`)"),
+            "the section starts at the first sorting method",
+        );
+        assert!(
+            methods.ends_with("This sorting method accepts the `--reverse` flag."),
+            "the section ends with the last sorting method",
+        );
+        assert!(
+            !methods.contains("## Linting and Tidying this Code"),
+            "the section stops before the rest of the README",
+        );
+    }
+
+    // A Windows checkout can hand us a README with `\r\n` line endings, which is what broke this
+    // the first time around.
+    #[test]
+    fn sorting_methods_survive_crlf_line_endings() {
+        let readme = concat!(
+            "# omegasort\r\n",
+            "\r\n",
+            "<!-- sorting-methods -->\r\n",
+            "\r\n",
+            "### Text (`--sort text`)\r\n",
+            "\r\n",
+            "This sorts each line.\r\n",
+            "\r\n",
+            "<!-- /sorting-methods -->\r\n",
+            "\r\n",
+            "## Linting and Tidying this Code\r\n",
+        );
+        assert_eq!(
+            super::sorting_methods_from(readme),
+            "### Text (`--sort text`)\n\nThis sorts each line.",
+        );
+    }
 
     #[test]
     fn lines_from_reader() -> Result<()> {

@@ -62,6 +62,8 @@ executable it contains somewhere in your path and you're good to go.
 - `ip` - sort the file assuming that each line is an IP address
 - `network` - sort the file assuming that each line is a network in CIDR form
 
+<!-- sorting-methods -->
+
 ### Text (`--sort text`)
 
 This sorts each line of the file as text without any special parsing. The exact sorting is
@@ -123,6 +125,8 @@ If there are two networks with the same base address they are sorted with the la
 (so 1.1.1.0/24 comes before 1.1.1.0/28). IPv4 networks always sort before IPv6 networks.
 
 This sorting method accepts the `--reverse` flag.
+
+<!-- /sorting-methods -->
 
 ## Linting and Tidying this Code
 
