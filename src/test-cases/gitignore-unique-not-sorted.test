@@ -1,0 +1,13 @@
+--sort gitignore --unique
+####
+NotSorted
+####
+# Tools
+/target/
+*.log
+!important.log
+####
+# Tools
+*.log
+/target/
+!important.log

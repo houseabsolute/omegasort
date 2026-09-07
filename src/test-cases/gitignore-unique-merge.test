@@ -1,0 +1,12 @@
+--sort gitignore --unique
+####
+NotUnique
+####
+zb
+!x
+za
+!x
+####
+za
+zb
+!x

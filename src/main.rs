@@ -3,10 +3,11 @@ extern crate alloc;
 mod collation;
 mod comparer;
 mod error;
+mod gitignore;
 mod logging;
 mod sorter;
 
-use crate::error::CheckError;
+use crate::{error::CheckError, gitignore::Grouper};
 use anyhow::{anyhow, Context, Error, Result};
 use clap::{CommandFactory, FromArgMatches, Parser};
 use log::{debug, error};
@@ -186,6 +187,20 @@ impl Cli {
             ));
         }
 
+        if self.reverse && !self.sort.supports_reverse() {
+            return Err(anyhow!(
+                "you cannot pass the --reverse flag when sorting {:?}, because reversing these files would change what they ignore",
+                self.sort,
+            ));
+        }
+
+        if self.comment_prefix.is_some() && self.sort.keeps_file_structure() {
+            return Err(anyhow!(
+                "you cannot set a comment prefix when sorting {:?}, because comments are part of the format and are always left where they are",
+                self.sort,
+            ));
+        }
+
         if self.in_place && self.check {
             return Err(anyhow!("you cannot set both --in-place and --stdout"));
         }
@@ -202,7 +217,7 @@ impl Cli {
             self.reverse,
             self.windows,
         )?;
-        let contents = read_lines(&self.file, self.comment_prefix.as_deref())?;
+        let contents = read_lines(&self.file, self.sort, self.comment_prefix.as_deref())?;
         if self.check {
             if contents.has_empty_lines {
                 return Err(CheckError::HasUnexpectedEmptyLines.into());
@@ -270,6 +285,19 @@ pub(crate) struct SortableLine {
     line_number: usize,
     line: String,
     comment: Option<Comment>,
+    /// Lines are sorted within a group and never moved across one. Every strategy but gitignore
+    /// puts the whole file in a single group.
+    group: usize,
+    kind: LineKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(crate) enum LineKind {
+    /// A line that takes part in sorting.
+    Sortable,
+    /// A line that stays exactly where it is, and that `--unique` never removes. Only gitignore
+    /// files have these.
+    Fence,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -279,13 +307,20 @@ struct Comment {
 }
 
 impl SortableLine {
-    // This is only used in tests.
+    // These are only used in tests.
     #[allow(dead_code)]
     fn from_number_and_str(from: (usize, &str)) -> Self {
+        Self::for_test(from.0, from.1, 0, LineKind::Sortable)
+    }
+
+    #[allow(dead_code)]
+    fn for_test(line_number: usize, line: &str, group: usize, kind: LineKind) -> Self {
         Self {
-            line_number: from.0,
-            line: from.1.to_string(),
+            line_number,
+            line: line.to_string(),
             comment: None,
+            group,
+            kind,
         }
     }
 }
@@ -298,14 +333,18 @@ struct FileContents {
     has_bom: bool,
 }
 
-fn read_lines<P: AsRef<Path>>(file: P, comment_prefix: Option<&str>) -> Result<FileContents> {
+fn read_lines<P: AsRef<Path>>(
+    file: P,
+    sort: Strategy,
+    comment_prefix: Option<&str>,
+) -> Result<FileContents> {
     let mut f = File::open(file.as_ref())?;
     let LineEndingChain {
         reader,
         line_ending,
         has_bom,
     } = determine_line_ending(&mut f)?;
-    let (lines, has_empty_lines) = lines_from_reader(comment_prefix, reader)?;
+    let (lines, has_empty_lines) = lines_from_reader(sort, comment_prefix, reader)?;
     Ok(FileContents {
         lines,
         has_empty_lines,
@@ -315,9 +354,16 @@ fn read_lines<P: AsRef<Path>>(file: P, comment_prefix: Option<&str>) -> Result<F
 }
 
 fn lines_from_reader<R: Read>(
+    sort: Strategy,
     comment_prefix: Option<&str>,
     read: R,
 ) -> Result<(Vec<SortableLine>, bool)> {
+    if sort.keeps_file_structure() {
+        // Nothing is dropped and nothing is an error, so there are never any unexpected empty lines
+        // to report.
+        return Ok((grouped_lines_from_reader(read)?, false));
+    }
+
     let reader = BufReader::new(read);
     let mut lines = vec![];
     let mut comment: Option<Comment> = None;
@@ -353,11 +399,36 @@ fn lines_from_reader<R: Read>(
             line_number: i + 1,
             line,
             comment,
+            group: 0,
+            kind: LineKind::Sortable,
         });
         last_line_was_empty = false;
         comment = None;
     }
     Ok((lines, has_empty_lines))
+}
+
+/// Reads a file whose own structure has to survive sorting. Every line is kept exactly as it was
+/// read, including blank lines and comments, and each is tagged with the group it may be sorted
+/// within.
+fn grouped_lines_from_reader<R: Read>(read: R) -> Result<Vec<SortableLine>> {
+    let reader = BufReader::new(read);
+    let mut grouper = Grouper::default();
+    let mut lines = vec![];
+
+    for (i, line) in reader.lines().enumerate() {
+        let line = line?;
+        let (group, kind) = grouper.next(&line);
+        lines.push(SortableLine {
+            line_number: i + 1,
+            line,
+            comment: None,
+            group,
+            kind,
+        });
+    }
+
+    Ok(lines)
 }
 
 // Doing the uniqueness check here lets us avoid iterating over the lines yet
@@ -383,15 +454,15 @@ fn write_lines_to_writer<W: Write>(contents: FileContents, out: &mut W) -> Resul
     // with a mark of its own, even when the file had none, because reading takes a mark off byte 0
     // without asking whose it is. Writing such a line bare would hand its mark to the file, and the
     // next read would eat it, turning `<BOM>x` into `x`. Our own mark in front keeps the line's
-    // where it belongs. A collator can sort such a line to the front of a file that never had a
-    // mark, so this is not only a problem for files that came in with one.
+    // where it belongs. Sorting alone cannot put that line first in a gitignore file, since a mark
+    // makes it a fence, but `--unique` can drop every line above it.
     if has_bom || first_line_written(&lines).starts_with('\u{feff}') {
         bw.write_all(&UTF8_BOM)?;
     }
     for (i, l) in lines.into_iter().enumerate() {
         if let Some(comment) = l.comment {
-            // If the comment is the first thing in the file we don't preserve
-            // its leading empty line.
+            // If the comment is the first thing in the file we don't preserve its leading empty
+            // line.
             if comment.is_preceded_by_empty_line && i != 0 {
                 bw.write_all(line_ending.as_bytes())?;
             }
@@ -436,9 +507,10 @@ struct LineEndingChain<'a> {
 /// Reads just far enough to see how the file ends its lines, then hands back a reader for the whole
 /// file along with the answer.
 ///
-/// A BOM belongs to the file, not to its first line. We take it off here and
-/// `write_lines_to_writer` puts it back, which keeps it at the front of the file however the lines
-/// are reordered.
+/// A BOM belongs to the file, not to its first line. Git skips one when it reads a gitignore file,
+/// so `<BOM>!foo` is a negation to git and not a pattern for a file whose name starts with a
+/// BOM. We take it off here and `write_lines_to_writer` puts it back, which keeps it at the front
+/// of the file however the lines are reordered.
 fn determine_line_ending(file: &mut File) -> Result<LineEndingChain<'_>> {
     let mut buf = [0; FIRST_CHUNK_SIZE];
     let read = file.read(&mut buf)?;
@@ -480,7 +552,8 @@ fn buf_contains_str(needle: &str, haystack: &[u8]) -> bool {
 mod test {
     use crate::{CheckError, Cli};
 
-    use super::{Comment, FileContents, LineEndingChain, SortableLine};
+    use super::{Comment, FileContents, LineEndingChain, LineKind, SortableLine};
+    use crate::sorter::Strategy;
     use anyhow::Result;
     use std::{
         fs::{metadata, read_dir, read_to_string, write, File},
@@ -564,7 +637,7 @@ baz
             .map(|l| format!("{l}\n"))
             .join("");
         assert_eq!(
-            super::lines_from_reader(None, lines.trim().as_bytes())?,
+            super::lines_from_reader(Strategy::Text, None, lines.trim().as_bytes())?,
             (
                 [(1, "foo"), (2, "bar"), (3, "baz"), (4, "quux")]
                     .into_iter()
@@ -578,7 +651,7 @@ baz
             .map(|l| format!("{l}\n"))
             .join("");
         assert_eq!(
-            super::lines_from_reader(None, lines.trim().as_bytes())?,
+            super::lines_from_reader(Strategy::Text, None, lines.trim().as_bytes())?,
             (
                 [(1, "foo"), (3, "bar"), (5, "baz"), (6, "quux")]
                     .into_iter()
@@ -590,38 +663,50 @@ baz
         );
 
         assert_eq!(
-            super::lines_from_reader(None, WITH_COMMENTS.trim_start().as_bytes())?,
+            super::lines_from_reader(Strategy::Text, None, WITH_COMMENTS.trim_start().as_bytes())?,
             (
                 vec![
                     SortableLine {
                         line_number: 1,
                         line: "foo".to_string(),
                         comment: None,
+                        group: 0,
+                        kind: LineKind::Sortable,
                     },
                     SortableLine {
                         line_number: 2,
                         line: "bar".to_string(),
                         comment: None,
+                        group: 0,
+                        kind: LineKind::Sortable,
                     },
                     SortableLine {
                         line_number: 3,
                         line: "# comment 1".to_string(),
                         comment: None,
+                        group: 0,
+                        kind: LineKind::Sortable,
                     },
                     SortableLine {
                         line_number: 4,
                         line: "baz".to_string(),
                         comment: None,
+                        group: 0,
+                        kind: LineKind::Sortable,
                     },
                     SortableLine {
                         line_number: 6,
                         line: "# comment 2".to_string(),
                         comment: None,
+                        group: 0,
+                        kind: LineKind::Sortable,
                     },
                     SortableLine {
                         line_number: 7,
                         line: "quux".to_string(),
                         comment: None,
+                        group: 0,
+                        kind: LineKind::Sortable,
                     },
                 ],
                 true,
@@ -629,18 +714,26 @@ baz
         );
 
         assert_eq!(
-            super::lines_from_reader(Some("#"), WITH_COMMENTS.trim_start().as_bytes())?,
+            super::lines_from_reader(
+                Strategy::Text,
+                Some("#"),
+                WITH_COMMENTS.trim_start().as_bytes()
+            )?,
             (
                 vec![
                     SortableLine {
                         line_number: 1,
                         line: "foo".to_string(),
                         comment: None,
+                        group: 0,
+                        kind: LineKind::Sortable,
                     },
                     SortableLine {
                         line_number: 2,
                         line: "bar".to_string(),
                         comment: None,
+                        group: 0,
+                        kind: LineKind::Sortable,
                     },
                     SortableLine {
                         line_number: 4,
@@ -649,6 +742,8 @@ baz
                             lines: vec!["# comment 1".to_string()],
                             is_preceded_by_empty_line: false,
                         }),
+                        group: 0,
+                        kind: LineKind::Sortable,
                     },
                     SortableLine {
                         line_number: 7,
@@ -657,6 +752,8 @@ baz
                             lines: vec!["# comment 2".to_string()],
                             is_preceded_by_empty_line: true,
                         }),
+                        group: 0,
+                        kind: LineKind::Sortable,
                     },
                 ],
                 false
@@ -699,13 +796,14 @@ baz
 
         for t in tests {
             let mut buf = vec![];
-            let (lines, _) = super::lines_from_reader(t.comment_marker, t.input.as_bytes())?;
+            let (lines, _) =
+                super::lines_from_reader(Strategy::Text, t.comment_marker, t.input.as_bytes())?;
             super::write_lines_to_writer(contents(lines, false), &mut buf)?;
             assert_eq!(unsafe { String::from_utf8_unchecked(buf) }, t.expect);
         }
 
         let mut buf = vec![];
-        let (lines, _) = super::lines_from_reader(None, "a\nb\n".as_bytes())?;
+        let (lines, _) = super::lines_from_reader(Strategy::Text, None, "a\nb\n".as_bytes())?;
         super::write_lines_to_writer(contents(lines, true), &mut buf)?;
         assert_eq!(
             unsafe { String::from_utf8_unchecked(buf) },
@@ -714,7 +812,8 @@ baz
         );
 
         let mut buf = vec![];
-        let (lines, _) = super::lines_from_reader(None, "\u{feff}a\nb\n".as_bytes())?;
+        let (lines, _) =
+            super::lines_from_reader(Strategy::Text, None, "\u{feff}a\nb\n".as_bytes())?;
         super::write_lines_to_writer(contents(lines, false), &mut buf)?;
         assert_eq!(
             unsafe { String::from_utf8_unchecked(buf) },
@@ -724,7 +823,8 @@ baz
         );
 
         let mut buf = vec![];
-        let (lines, _) = super::lines_from_reader(None, "\u{feff}a\nb\n".as_bytes())?;
+        let (lines, _) =
+            super::lines_from_reader(Strategy::Text, None, "\u{feff}a\nb\n".as_bytes())?;
         super::write_lines_to_writer(contents(lines, true), &mut buf)?;
         assert_eq!(
             unsafe { String::from_utf8_unchecked(buf) },
@@ -819,8 +919,45 @@ baz
     }
 
     #[test]
+    fn gitignore_rejects_flags_that_do_not_fit_the_format() {
+        let validate = |extra: &[&str]| -> Result<()> {
+            let mut args = vec![
+                String::from("omegasort"),
+                String::from("--sort"),
+                String::from("gitignore"),
+            ];
+            args.extend(extra.iter().map(ToString::to_string));
+            args.push(String::from("ignored.txt"));
+            Cli::new_from_args(args)?.validate_args()
+        };
+
+        for extra in [
+            vec!["--reverse"],
+            vec!["--windows"],
+            vec!["--comment-prefix", "#"],
+        ] {
+            assert!(
+                validate(&extra).is_err(),
+                "{extra:?} is rejected when sorting a gitignore file",
+            );
+        }
+
+        for extra in [
+            vec![],
+            vec!["--unique"],
+            vec!["--case-insensitive"],
+            vec!["--locale", "en-US"],
+        ] {
+            assert!(
+                validate(&extra).is_ok(),
+                "{extra:?} is accepted when sorting a gitignore file",
+            );
+        }
+    }
+
+    #[test]
     fn a_bom_stays_at_the_front_of_the_file() -> Result<()> {
-        let sorted = |extra: &[&str], content: &str| -> Result<String> {
+        let sorted = |strategy: &str, extra: &[&str], content: &str| -> Result<String> {
             let td = tempdir()?;
             let mut filename = td.path().to_path_buf();
             filename.push("input.txt");
@@ -829,7 +966,7 @@ baz
             let mut args = vec![
                 String::from("omegasort"),
                 String::from("--sort"),
-                String::from("text"),
+                String::from(strategy),
                 String::from("--in-place"),
             ];
             args.extend(extra.iter().map(|a| String::from(*a)));
@@ -840,15 +977,39 @@ baz
         };
 
         assert_eq!(
-            sorted(&[], "\u{feff}zebra\napple\n")?,
+            sorted("gitignore", &[], "\u{feff}zebra\napple\n")?,
             "\u{feff}apple\nzebra\n",
             "the BOM does not travel with the line it was in front of",
         );
         assert_eq!(
-            sorted(&["--locale", "en-US"], "zzz\n\u{feff}aaa\n")?,
+            sorted("text", &[], "\u{feff}zebra\napple\n")?,
+            "\u{feff}apple\nzebra\n",
+            "every sorting method leaves the BOM at the front, not just this one",
+        );
+        assert_eq!(
+            sorted("gitignore", &[], "\u{feff}!foo\n!bar\nbaz\n")?,
+            "\u{feff}!bar\n!foo\nbaz\n",
+            "the first line is a negation, as it is to git, so it groups with the next one",
+        );
+        assert_eq!(
+            sorted("gitignore", &[], "zb\nza\n\u{feff}x\nb\na\n")?,
+            "za\nzb\n\u{feff}x\na\nb\n",
+            "a BOM after the first line is part of the pattern, so that line stays where it is \
+             and splits the run in two. Sorting it to the front would turn a `<BOM>!foo` into \
+             the negation `!foo` and change what the file ignores.",
+        );
+        assert_eq!(
+            sorted("gitignore", &["--unique"], "a\n\u{feff}x\na\n")?,
+            "\u{feff}\u{feff}x\na\n",
+            "--unique can drop every line above a BOM line and leave it first. It gets a BOM \
+             written in front of it so that git still reads it as a pattern for a file whose \
+             name starts with a mark, not as the pattern `x`.",
+        );
+        assert_eq!(
+            sorted("text", &["--locale", "en-US"], "zzz\n\u{feff}aaa\n")?,
             "\u{feff}\u{feff}aaa\nzzz\n",
-            "a collator can sort a BOM line to the front of a file that had no BOM. Without the \
-             extra BOM the line would lose its own.",
+            "a collator can sort a BOM line to the front of a file that had no BOM, so this is \
+             not only a gitignore problem. Without the extra BOM the line would lose its own.",
         );
 
         Ok(())
@@ -996,7 +1157,30 @@ baz
         let res = cli.execute();
         assert!(res.is_ok(), "no error sorting file: {res:?}");
 
-        assert_eq!(read_to_string(filename)?, expect);
+        assert_eq!(read_to_string(&filename)?, expect);
+
+        // What the sorter produced has to pass the sorter's own check, and sorting it a second time
+        // has to leave it alone. Without this a case can pass while `--check` still rejects the
+        // output it asked for.
+        let mut recheck_args = args.clone();
+        recheck_args.append(&mut vec![
+            String::from("--check"),
+            filename.to_string_lossy().to_string(),
+        ]);
+        let res = Cli::new_from_args(recheck_args)?.execute();
+        assert!(res.is_ok(), "sorted output passes --check: {res:?}");
+
+        let mut resort_args = args;
+        resort_args.append(&mut vec![
+            String::from("--in-place"),
+            filename.to_string_lossy().to_string(),
+        ]);
+        Cli::new_from_args(resort_args)?.execute()?;
+        assert_eq!(
+            read_to_string(&filename)?,
+            expect,
+            "sorting the output again does not change it",
+        );
 
         Ok(())
     }

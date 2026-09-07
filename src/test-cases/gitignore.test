@@ -1,0 +1,27 @@
+--sort gitignore
+####
+NotSorted
+####
+# Build output
+/target/
+*.log
+
+# Keep the checked-in log
+!important.log
+
+node_modules
+/node_modules
+vendor/*
+!vendor/keep-me
+####
+# Build output
+*.log
+/target/
+
+# Keep the checked-in log
+!important.log
+
+/node_modules
+node_modules
+vendor/*
+!vendor/keep-me

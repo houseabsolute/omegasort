@@ -4,6 +4,14 @@
 
 - Running `--check` with `--reverse` would incorrectly report a file as unsorted when it had two
   identical lines.
+- Added a new `gitignore` sorting method. Gitignore files are more complex than just a list of
+  paths, and ordering in the file matters when it comes to things like lines with `!` prefixes. See
+  the documentation for this sorting method for more details. Addresses GH #13.
+
+  Using `--sort path` on a `.gitignore` file can silently change what that file ignores in some
+  cases, because it moves negations without regard to the patterns they override. Use
+  `--sort gitignore` for these files instead.
+
 - A BOM at the start of a file is no longer treated as part of its first line. Previously, this
   would be treated as file content and could be sorted onto a different line. Now, the BOM is
   excluded from sorting and left in place.

@@ -29,22 +29,22 @@ executable it contains somewhere in your path and you're good to go.
 
 ### Flags:
 
-| Short | Long                      | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ----- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `-s`  | `--sort <SORT>`           | The type of sorting to use. See below for options.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `-l`  | `--locale <LOCALE>`       | The locale to use for sorting. If this is not specified the sorting is in codepoint order.                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `-u`  | `--unique`                | Make the file contents unique, or check that they're unique when used with `--check`.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-|       | `--comment-prefix PREFIX` | A string that precedes comments. If this is set, comments starting with this string will be preserved and come before the same line in the sorted output. If the comment is preceded by an empty line, that empty line will also be preserved, unless the comment is the first thing in the file. If the `--unique` flag is also set then only the comment from the first instance of a repeated line will be preserved. If the `--reverse flag` is also set then only the last instance's comment will be preserved. |
-| `-c`  | `--case-insensitive`      | Sort case-insensitively. Note that many locales always do this so if you specify a locale you may get case-insensitive output regardless of this flag.                                                                                                                                                                                                                                                                                                                                                                |
-| `-r`  | `--reverse`               | Sort in reverse order.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-|       | `--windows`               | Parse paths as Windows paths for path sort.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `-i`  | `--in-place`              | Modify the file in place instead of making a backup.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-|       | `--stdout`                | Print the sorted output to stdout instead of making a new file.                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-|       | `--check`                 | Check that the file is sorted instead of sorting it. If it is not sorted the exit status will be 1.                                                                                                                                                                                                                                                                                                                                                                                                                   |
-|       | `--debug`                 | Print out debugging info while running.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `-h`  |                           | Show help summary.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-|       | `--help`                  | Show extended help with details about each sorting type.                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `-V`  | `--version`               | Show application version.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Short | Long                      | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-s`  | `--sort <SORT>`           | The type of sorting to use. See below for options.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `-l`  | `--locale <LOCALE>`       | The locale to use for sorting. If this is not specified the sorting is in codepoint order.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `-u`  | `--unique`                | Make the file contents unique, or check that they're unique when used with `--check`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+|       | `--comment-prefix PREFIX` | A string that precedes comments. If this is set, comments starting with this string will be preserved and come before the same line in the sorted output. If the comment is preceded by an empty line, that empty line will also be preserved, unless the comment is the first thing in the file. If the `--unique` flag is also set then only the comment from the first instance of a repeated line will be preserved. If the `--reverse flag` is also set then only the last instance's comment will be preserved. Not accepted with `--sort gitignore`, which always handles `#` comments. |
+| `-c`  | `--case-insensitive`      | Sort case-insensitively. Note that many locales always do this so if you specify a locale you may get case-insensitive output regardless of this flag.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `-r`  | `--reverse`               | Sort in reverse order. Not accepted with `--sort gitignore`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+|       | `--windows`               | Parse paths as Windows paths for `--sort path`. Not accepted with `--sort gitignore`, where `/` is always the separator.                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `-i`  | `--in-place`              | Modify the file in place instead of making a backup.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+|       | `--stdout`                | Print the sorted output to stdout instead of making a new file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+|       | `--check`                 | Check that the file is sorted instead of sorting it. If it is not sorted the exit status will be 1.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+|       | `--debug`                 | Print out debugging info while running.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `-h`  |                           | Show help summary.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+|       | `--help`                  | Show extended help with details about each sorting type.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `-V`  | `--version`               | Show application version.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 ### Positional Args:
 
@@ -59,6 +59,8 @@ executable it contains somewhere in your path and you're good to go.
   then fall back to sorting by text according to the specified locale
 - `path` - sort the file assuming that each line is a path, sorted so that deeper paths come after
   shorter
+- `gitignore` - sort the file assuming that each line is a gitignore pattern, sorting within the
+  blocks the file is already divided into so that what it ignores cannot change
 - `ip` - sort the file assuming that each line is an IP address
 - `network` - sort the file assuming that each line is a network in CIDR form
 
@@ -107,6 +109,115 @@ The paths are sorted by the following rules:
 
 This sorting method accepts the `--locale`, `--case-insensitive`, and `--reverse` flags in addition
 to the `--windows` flag.
+
+### Gitignore (`--sort gitignore`)
+
+Each line is treated as a gitignore pattern.
+
+Git uses the _last_ pattern matching a path to decide whether that path is ignored, so moving one
+line past another can change what a file ignores. To make that impossible, this sorting method
+breaks a file into blocks and lines are only ever sorted within a block. A blank line, a comment, a
+line starting with a byte order mark, and every switch between a line starting with and without `!`
+marks the boundary between blocks. A line is never moved across a boundary.
+
+A run of consecutive `!` lines is a new block, and these lines are sorted within the block. These
+blocks are left in place relative to other blocks.
+
+Sorting a `.gitignore` file this way never changes what it ignores, whatever the patterns are. It
+also means the sort stops at the boundaries the author drew, so a file organized into blocks is
+tidied block by block instead of being flattened into one list.
+
+Within a block, patterns are sorted as text by these rules:
+
+- The leading `!`, any leading `/`, and any trailing `/` are ignored when comparing. This means that
+  `foo`, `/foo`, `foo/`, and `!foo` each sort where the name alone would, instead of being scattered
+  by their punctuation.
+- A leading `**/` or `/**/` is ignored too, but only when a single name follows it, since git
+  documents `**/foo` as meaning the same thing as `foo`. A pattern like `**/a/b` keeps its prefix,
+  because it matches `b` in any `a` directory while `a/b` is anchored to the top of the tree.
+- Spaces at the end of a line are ignored, since git strips them, so a pattern written with spaces
+  after it sorts where it would without them. A space escaped with a `\` is part of the pattern and
+  is kept.
+- If two patterns are otherwise equal, anchored patterns (those starting with `/`) come first, then
+  directory-only patterns (those ending with `/`), then patterns without a `**/` prefix.
+- A leading `\!` or `\#` is an escape, so those lines are sorted by the literal `!` or `#` and are
+  not treated as negations.
+
+So this file:
+
+```gitignore
+# Build output
+/target/
+*.log
+
+# Keep the checked-in log
+!important.log
+
+node_modules
+/node_modules
+vendor/*
+!vendor/keep-me
+```
+
+sorts to this:
+
+```gitignore
+# Build output
+*.log
+/target/
+
+# Keep the checked-in log
+!important.log
+
+/node_modules
+node_modules
+vendor/*
+!vendor/keep-me
+```
+
+Blank lines and comments are kept where they were, so the `--comment-prefix` flag is not accepted
+with this sorting method. A `#` in the first column is already a comment in this format, and
+comments never move.
+
+A negation which was already doing nothing goes on doing nothing, since fixing it would mean
+changing what the file ignores. Use `git check-ignore -v` to find out which pattern really decides
+whether to ignore a given path.
+
+With `--unique`, two lines count as the same pattern when git would read them the same way, so
+`foo`, `**/foo`, `/**/foo`, and `foo` followed by a space are all one pattern. The copy that is kept
+is the _last_ one. Keeping an earlier copy could change what the file ignores, since a later copy
+may be overriding a negation between them.
+
+Removing lines can change which lines may be sorted together. If the only negation between two runs
+of patterns goes away, those runs become one block and are sorted together. And if the only pattern
+before a blank line goes away, that blank line ends up at the top of the file. Neither of these
+changes what the file ignores, but both show up in the diff.
+
+This sorting method accepts the `--locale` and `--case-insensitive` flags. It does not accept the
+`--windows` flag, since gitignore patterns always use `/` as the separator.
+
+It does not accept the `--reverse` flag either. There's no meaningful way to reverse the sorting
+order of a `.gitignore` file.
+
+This sorting method can also be used for `.npmignore` and `.dockerignore` files, but those differ
+from `.gitignore` files in some ways. Both npm and Docker trim the whitespace around a pattern
+before they look for the `!`, and git does not. So a line that puts a space before the `!` is a
+negation to npm and Docker. This method follows git, so it sorts that line in among the plain
+patterns. This will move negations for those files, which could cause them to not be applied as
+expected. If you want to use this sorting method for those files, make sure you don't have any
+negation lines that start with whitespace.
+
+Only use `--unique` on files that really do follow git's rules, such as `.npmignore`. A bare `foo`
+in a `.dockerignore` file matches only at the top of the tree, so two lines that `omegasort` would
+call one pattern can be two different patterns to Docker.
+
+A line starting with a byte order mark stays where it is. Git skips one BOM at the very start of a
+file, so `<BOM>!foo` is the negation `!foo` on the first line and a pattern for a file whose name
+begins with a mark anywhere else. A mark at the start of the file is left at the front, in front of
+whichever line ends up first. If a line carrying its own mark ends up first in a file that had none,
+a mark is written in front of it, so that reading the file back does not take the line's mark for
+the file's. Note that this case is somewhat pathological, since it doesn't make sense to use a BOM
+byte in a regular ignore pattern most of the time!
 
 ### IP (`--sort ip`)
 

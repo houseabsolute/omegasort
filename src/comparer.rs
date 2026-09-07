@@ -1,3 +1,4 @@
+use crate::gitignore::GitignorePattern;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use dateparser::DateTimeUtc;
@@ -392,6 +393,67 @@ impl PathComparer {
     }
 }
 
+pub(crate) struct GitignoreComparer {
+    text_comparer: TextComparer,
+}
+
+impl Comparer for GitignoreComparer {
+    fn cmp(&self, str1: &str, str2: &str) -> Result<Ordering> {
+        debug!("GitignoreComparer comparing patterns: `{str1}` <=> `{str2}`");
+
+        let pat1 = GitignorePattern::new(str1);
+        let pat2 = GitignorePattern::new(str2);
+
+        let ord = self.text_comparer.cmp(pat1.path, pat2.path)?;
+        debug!("  `{}` <=> `{}`: {ord:?}", pat1.path, pat2.path);
+        if ord != Ordering::Equal {
+            return Ok(ord);
+        }
+
+        // Anchored patterns sort before unanchored ones.
+        if pat1.anchored != pat2.anchored {
+            debug!("  only one side is anchored, so it sorts first");
+            return Ok(pat2.anchored.cmp(&pat1.anchored));
+        }
+
+        // Directory-only patterns sort before ones that match any entry.
+        if pat1.dir_only != pat2.dir_only {
+            debug!("  only one side is directory-only, so it sorts first");
+            return Ok(pat2.dir_only.cmp(&pat1.dir_only));
+        }
+
+        // `foo` and `**/foo` are the same pattern, so they sort together with the shorter spelling
+        // first.
+        if pat1.double_star != pat2.double_star {
+            debug!("  only one side is spelled with a `**/` prefix, so it sorts last");
+            return Ok(pat1.double_star.cmp(&pat2.double_star));
+        }
+
+        // Two lines of different polarity are never in the same group, so this never decides
+        // anything real. It is here so that the ordering is total.
+        if pat1.negated != pat2.negated {
+            debug!("  the patterns differ only in whether they are negated");
+            return Ok(pat1.negated.cmp(&pat2.negated));
+        }
+
+        // Falling back to the bytes means the comparer alone decides the order, rather than leaving
+        // it to whether the sort is stable.
+        debug!("  falling back to comparing the lines as written");
+        Ok(str1.cmp(str2))
+    }
+}
+
+impl GitignoreComparer {
+    pub(crate) fn new(collator: Option<Collator>, case_insensitive: bool) -> Self {
+        Self {
+            // Gitignore patterns are a flat list of match rules rather than a directory listing, so
+            // they are compared as plain text. Sorting them by depth the way `PathComparer` does
+            // would put `zzz` above `a/a`, which reads as an error in a file like this.
+            text_comparer: TextComparer::new(collator, case_insensitive),
+        }
+    }
+}
+
 pub(crate) struct IpComparer;
 
 impl Comparer for IpComparer {
@@ -494,8 +556,8 @@ fn octets_for_ip_address(ip: IpAddr) -> [u8; 16] {
 #[cfg(test)]
 mod test {
     use super::{
-        Comparer, DatetimeTextComparer, IpComparer, NetworkComparer, NumberedTextComparer,
-        PathComparer, PathType, TextComparer,
+        Comparer, DatetimeTextComparer, GitignoreComparer, IpComparer, NetworkComparer,
+        NumberedTextComparer, PathComparer, PathType, TextComparer,
     };
     use crate::collation::collator_for_locale;
     use test_log::test;
@@ -507,47 +569,6 @@ mod test {
         #[allow(clippy::struct_field_names)]
         case_insensitive: bool,
         locale: Option<&'static str>,
-    }
-
-    #[test]
-    fn is_ordered_only_flags_a_real_violation() {
-        let tc = TextComparer {
-            collator: None,
-            case_insensitive: false,
-        };
-
-        for (first, second, reverse, expect, why) in [
-            (
-                "b",
-                "a",
-                false,
-                false,
-                "b before a is out of order going up",
-            ),
-            ("a", "b", false, true, "a before b is in order going up"),
-            (
-                "a",
-                "b",
-                true,
-                false,
-                "a before b is out of order going down",
-            ),
-            ("b", "a", true, true, "b before a is in order going down"),
-            ("a", "a", false, true, "equal lines are in order going up"),
-            (
-                "a",
-                "a",
-                true,
-                true,
-                "equal lines are in order going down too",
-            ),
-        ] {
-            assert_eq!(
-                tc.is_ordered(first, second, reverse).unwrap(),
-                expect,
-                "{why}",
-            );
-        }
     }
 
     #[test]
@@ -617,6 +638,61 @@ mod test {
                 },
             };
             c.input.sort_by(|a, b| pc.cmp(a, b).unwrap());
+            assert_eq!(c.input, c.expect);
+        }
+    }
+
+    #[test]
+    fn is_ordered_only_flags_a_real_violation() {
+        let tc = TextComparer {
+            collator: None,
+            case_insensitive: false,
+        };
+
+        for (first, second, reverse, expect, why) in [
+            (
+                "b",
+                "a",
+                false,
+                false,
+                "b before a is out of order going up",
+            ),
+            ("a", "b", false, true, "a before b is in order going up"),
+            (
+                "a",
+                "b",
+                true,
+                false,
+                "a before b is out of order going down",
+            ),
+            ("b", "a", true, true, "b before a is in order going down"),
+            ("a", "a", false, true, "equal lines are in order going up"),
+            (
+                "a",
+                "a",
+                true,
+                true,
+                "equal lines are in order going down too",
+            ),
+        ] {
+            assert_eq!(
+                tc.is_ordered(first, second, reverse).unwrap(),
+                expect,
+                "{why}",
+            );
+        }
+    }
+
+    #[test]
+    fn gitignore_comparer() {
+        for mut c in cases_from(GITIGNORE_TEST_CASES) {
+            println!("# gitignore - {}", c.name);
+            let gc = GitignoreComparer::new(
+                c.locale
+                    .map(|l| collator_for_locale(l, c.case_insensitive).unwrap()),
+                c.case_insensitive,
+            );
+            c.input.sort_by(|a, b| gc.cmp(a, b).unwrap());
             assert_eq!(c.input, c.expect);
         }
     }
@@ -1070,6 +1146,131 @@ baz/quux
 false
 ----
 sv-SE
+";
+
+    // These cases exercise the comparer on a flat list of lines. They do not test gitignore sorting
+    // end to end. The comparer never sees the blocks that `gitignore::Grouper` cuts the file into,
+    // so some of the orderings below cannot come out of the tool: a negation and a plain pattern
+    // land in different blocks and are never compared against each other. See
+    // `src/test-cases/gitignore.test` for the whole pipeline.
+    const GITIGNORE_TEST_CASES: &str = r"
+the leading bang is ignored when comparing
+----
+!important.log
+*.log
+!vendor/keep
+/target
+----
+*.log
+!important.log
+/target
+!vendor/keep
+----
+false
+====
+markers do not split up related patterns
+----
+node_modules
+target
+/node_modules
+node_modules/
+/target/
+----
+/node_modules
+node_modules/
+node_modules
+/target/
+target
+----
+false
+====
+patterns sort as plain text, not by depth
+----
+zzz
+bbb
+xxx/a
+aaaaaa/q/r
+----
+aaaaaa/q/r
+bbb
+xxx/a
+zzz
+----
+false
+====
+every spelling of one pattern sorts together
+----
+zzz
+/**/foo
+foo
+**/a/b
+**/foo
+a/b
+----
+**/a/b
+a/b
+foo
+**/foo
+/**/foo
+zzz
+----
+false
+====
+escaped bang is not a negation
+----
+!foo
+\!foo
+bar
+----
+\!foo
+bar
+!foo
+----
+false
+====
+case-insensitive
+----
+!Zed
+Foo
+bar
+!alpha
+----
+!alpha
+bar
+Foo
+!Zed
+----
+true
+====
+with sv-SE locale
+----
+zoo
+foo
+öoo
+----
+foo
+zoo
+öoo
+----
+false
+----
+sv-SE
+====
+with de-DE locale, where `ö` sorts with `o` instead of after `z`
+----
+zoo
+!öoo
+/öoo
+foo
+----
+foo
+/öoo
+!öoo
+zoo
+----
+false
+----
+de-DE
 ";
 
     const IP_TEST_CASES: &str = r"

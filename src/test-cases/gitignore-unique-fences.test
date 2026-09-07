@@ -1,0 +1,27 @@
+--sort gitignore --unique
+####
+NotSorted
+####
+# x
+b
+a
+
+# x
+d
+c
+
+# x
+f
+e
+####
+# x
+a
+b
+
+# x
+c
+d
+
+# x
+e
+f

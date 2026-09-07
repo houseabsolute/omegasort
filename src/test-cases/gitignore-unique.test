@@ -1,0 +1,21 @@
+--sort gitignore --unique
+####
+NotUnique
+####
+# Logs
+*.log
+!important.log
+*.log
+
+# Deps
+node_modules
+**/node_modules
+/vendor
+####
+# Logs
+!important.log
+*.log
+
+# Deps
+**/node_modules
+/vendor
