@@ -606,6 +606,7 @@ mod test {
         path::PathBuf,
     };
     use tempfile::tempdir;
+    use test_case::test_case;
     use test_log::test;
 
     const WITH_COMMENTS: &str = r"
@@ -820,35 +821,20 @@ baz
         }
     }
 
-    #[allow(clippy::items_after_statements)]
+    #[test_case(WITH_COMMENTS ; "comments are kept where they are")]
+    #[test_case(WITH_REPEATED_LINES ; "repeated lines are all written back")]
+    fn write_lines_to_writer(content: &str) -> Result<()> {
+        let content = content.trim_start();
+        let mut buf = vec![];
+        let (lines, _) = super::lines_from_reader(Strategy::Text, Some("#"), content.as_bytes())?;
+        super::write_lines_to_writer(contents(lines, false), &mut buf)?;
+        assert_eq!(unsafe { String::from_utf8_unchecked(buf) }, content);
+
+        Ok(())
+    }
+
     #[test]
-    fn write_lines_to_writer() -> Result<()> {
-        struct TestCase<'a> {
-            comment_marker: Option<&'static str>,
-            input: &'a str,
-            expect: &'a str,
-        }
-        let tests = [
-            TestCase {
-                comment_marker: Some("#"),
-                input: WITH_COMMENTS.trim_start(),
-                expect: WITH_COMMENTS.trim_start(),
-            },
-            TestCase {
-                comment_marker: Some("#"),
-                input: WITH_REPEATED_LINES.trim_start(),
-                expect: WITH_REPEATED_LINES.trim_start(),
-            },
-        ];
-
-        for t in tests {
-            let mut buf = vec![];
-            let (lines, _) =
-                super::lines_from_reader(Strategy::Text, t.comment_marker, t.input.as_bytes())?;
-            super::write_lines_to_writer(contents(lines, false), &mut buf)?;
-            assert_eq!(unsafe { String::from_utf8_unchecked(buf) }, t.expect);
-        }
-
+    fn write_lines_to_writer_and_boms() -> Result<()> {
         let mut buf = vec![];
         let (lines, _) = super::lines_from_reader(Strategy::Text, None, "a\nb\n".as_bytes())?;
         super::write_lines_to_writer(contents(lines, true), &mut buf)?;
@@ -985,41 +971,36 @@ baz
         Ok(())
     }
 
-    #[test]
-    fn gitignore_rejects_flags_that_do_not_fit_the_format() {
-        let validate = |extra: &[&str]| -> Result<()> {
-            let mut args = vec![
-                String::from("omegasort"),
-                String::from("--sort"),
-                String::from("gitignore"),
-            ];
-            args.extend(extra.iter().map(ToString::to_string));
-            args.push(String::from("ignored.txt"));
-            Cli::new_from_args(args)?.validate_args()
-        };
+    fn validate_gitignore_args(extra: &[&str]) -> Result<()> {
+        let mut args = vec![
+            String::from("omegasort"),
+            String::from("--sort"),
+            String::from("gitignore"),
+        ];
+        args.extend(extra.iter().map(ToString::to_string));
+        args.push(String::from("ignored.txt"));
+        Cli::new_from_args(args)?.validate_args()
+    }
 
-        for extra in [
-            vec!["--reverse"],
-            vec!["--windows"],
-            vec!["--comment-prefix", "#"],
-        ] {
-            assert!(
-                validate(&extra).is_err(),
-                "{extra:?} is rejected when sorting a gitignore file",
-            );
-        }
+    #[test_case(&["--reverse"] ; "reverse")]
+    #[test_case(&["--windows"] ; "windows")]
+    #[test_case(&["--comment-prefix", "#"] ; "comment prefix")]
+    fn gitignore_rejects_flags_that_do_not_fit_the_format(extra: &[&str]) {
+        assert!(
+            validate_gitignore_args(extra).is_err(),
+            "{extra:?} is rejected when sorting a gitignore file",
+        );
+    }
 
-        for extra in [
-            vec![],
-            vec!["--unique"],
-            vec!["--case-insensitive"],
-            vec!["--locale", "en-US"],
-        ] {
-            assert!(
-                validate(&extra).is_ok(),
-                "{extra:?} is accepted when sorting a gitignore file",
-            );
-        }
+    #[test_case(&[] ; "no extra flags")]
+    #[test_case(&["--unique"] ; "unique")]
+    #[test_case(&["--case-insensitive"] ; "case insensitive")]
+    #[test_case(&["--locale", "en-US"] ; "locale")]
+    fn gitignore_accepts_flags_that_fit_the_format(extra: &[&str]) {
+        assert!(
+            validate_gitignore_args(extra).is_ok(),
+            "{extra:?} is accepted when sorting a gitignore file",
+        );
     }
 
     #[test]
@@ -1082,52 +1063,55 @@ baz
         Ok(())
     }
 
-    #[test]
-    fn a_file_with_no_line_ending_is_not_an_error() -> Result<()> {
-        // A file with no line ending in it holds at most one line, so there is nothing in it to
-        // reorder. Sorting it used to fail outright because we could not work out what to end its
-        // lines with.
-        let run = |strategy: &str, extra: &[&str], content: &str| -> Result<String> {
-            let td = tempdir()?;
-            let mut filename = td.path().to_path_buf();
-            filename.push("input.txt");
-            write(&filename, content)?;
+    // Passing `--check` in `extra` leaves off `--in-place`, since the two cannot be given
+    // together, and returns the file as `--check` left it.
+    fn sorted_in_place(strategy: &str, extra: &[&str], content: &str) -> Result<String> {
+        let td = tempdir()?;
+        let mut filename = td.path().to_path_buf();
+        filename.push("input.txt");
+        write(&filename, content)?;
 
-            let mut args = vec![
-                String::from("omegasort"),
-                String::from("--sort"),
-                String::from(strategy),
-            ];
-            if !extra.contains(&"--check") {
-                args.push(String::from("--in-place"));
-            }
-            args.extend(extra.iter().map(|a| String::from(*a)));
-            args.push(filename.to_string_lossy().to_string());
-            Cli::new_from_args(args)?.execute()?;
-
-            Ok(read_to_string(filename)?)
-        };
-
-        for (strategy, extra) in [
-            ("text", &[][..]),
-            ("text", &["--check"][..]),
-            ("gitignore", &[][..]),
-            ("gitignore", &["--unique"][..]),
-        ] {
-            assert_eq!(
-                run(strategy, extra, "foo")?,
-                "foo",
-                "one line with no line ending after it is left alone by --sort {strategy} {extra:?}",
-            );
-            assert_eq!(
-                run(strategy, extra, "")?,
-                "",
-                "an empty file is left alone by --sort {strategy} {extra:?}",
-            );
+        let mut args = vec![
+            String::from("omegasort"),
+            String::from("--sort"),
+            String::from(strategy),
+        ];
+        if !extra.contains(&"--check") {
+            args.push(String::from("--in-place"));
         }
+        args.extend(extra.iter().map(|a| String::from(*a)));
+        args.push(filename.to_string_lossy().to_string());
+        Cli::new_from_args(args)?.execute()?;
 
-        // Writing is the one place the fallback line ending is visible, and `--stdout` is the only
-        // way to reach it, since a file that cannot be reordered is never rewritten.
+        Ok(read_to_string(filename)?)
+    }
+
+    // A file with no line ending in it holds at most one line, so there is nothing in it to
+    // reorder. Sorting it used to fail outright because we could not work out what to end its
+    // lines with.
+    #[test_case("text", &[] ; "text")]
+    #[test_case("text", &["--check"] ; "text with check")]
+    #[test_case("gitignore", &[] ; "gitignore")]
+    #[test_case("gitignore", &["--unique"] ; "gitignore with unique")]
+    fn a_file_with_no_line_ending_is_not_an_error(strategy: &str, extra: &[&str]) -> Result<()> {
+        assert_eq!(
+            sorted_in_place(strategy, extra, "foo")?,
+            "foo",
+            "one line with no line ending after it is left alone by --sort {strategy} {extra:?}",
+        );
+        assert_eq!(
+            sorted_in_place(strategy, extra, "")?,
+            "",
+            "an empty file is left alone by --sort {strategy} {extra:?}",
+        );
+
+        Ok(())
+    }
+
+    // Writing is the one place the fallback line ending is visible, and `--stdout` is the only way
+    // to reach it, since a file that cannot be reordered is never rewritten.
+    #[test]
+    fn a_file_with_no_line_ending_gets_the_fallback_when_it_is_written_out() -> Result<()> {
         let td = tempdir()?;
         let mut filename = td.path().to_path_buf();
         filename.push("input.txt");

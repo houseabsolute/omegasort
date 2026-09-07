@@ -560,6 +560,7 @@ mod test {
         NumberedTextComparer, PathComparer, PathType, TextComparer,
     };
     use crate::collation::collator_for_locale;
+    use test_case::test_case;
     use test_log::test;
 
     struct Case {
@@ -642,45 +643,23 @@ mod test {
         }
     }
 
-    #[test]
-    fn is_ordered_only_flags_a_real_violation() {
+    #[test_case("b", "a", false, false ; "b before a is out of order going up")]
+    #[test_case("a", "b", false, true ; "a before b is in order going up")]
+    #[test_case("a", "b", true, false ; "a before b is out of order going down")]
+    #[test_case("b", "a", true, true ; "b before a is in order going down")]
+    #[test_case("a", "a", false, true ; "equal lines are in order going up")]
+    #[test_case("a", "a", true, true ; "equal lines are in order going down too")]
+    fn is_ordered_only_flags_a_real_violation(
+        first: &str,
+        second: &str,
+        reverse: bool,
+        expect: bool,
+    ) {
         let tc = TextComparer {
             collator: None,
             case_insensitive: false,
         };
-
-        for (first, second, reverse, expect, why) in [
-            (
-                "b",
-                "a",
-                false,
-                false,
-                "b before a is out of order going up",
-            ),
-            ("a", "b", false, true, "a before b is in order going up"),
-            (
-                "a",
-                "b",
-                true,
-                false,
-                "a before b is out of order going down",
-            ),
-            ("b", "a", true, true, "b before a is in order going down"),
-            ("a", "a", false, true, "equal lines are in order going up"),
-            (
-                "a",
-                "a",
-                true,
-                true,
-                "equal lines are in order going down too",
-            ),
-        ] {
-            assert_eq!(
-                tc.is_ordered(first, second, reverse).unwrap(),
-                expect,
-                "{why}",
-            );
-        }
+        assert_eq!(tc.is_ordered(first, second, reverse).unwrap(), expect);
     }
 
     #[test]

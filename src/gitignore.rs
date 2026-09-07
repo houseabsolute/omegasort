@@ -241,6 +241,7 @@ pub(crate) fn dedup_keeping_last(lines: Vec<SortableLine>) -> Vec<SortableLine> 
 mod test {
     use super::{dedup_keeping_last, trim_trailing_spaces, unique_key, GitignorePattern, Grouper};
     use crate::{LineKind, SortableLine};
+    use test_case::test_case;
     use test_log::test;
 
     fn groups(lines: &[&str]) -> Vec<usize> {
@@ -441,116 +442,100 @@ mod test {
         );
     }
 
-    #[test]
-    fn trailing_spaces_are_trimmed_like_git_does() {
-        let cases = [
-            ("foo", "foo"),
-            ("foo ", "foo"),
-            ("foo   ", "foo"),
-            ("a b", "a b"),
-            ("a b  ", "a b"),
-            ("   ", ""),
-            // Only spaces are stripped, so this line is a pattern for a file whose name is a tab.
-            ("\t", "\t"),
-            (" \t ", " \t"),
-            // A `\` escapes the space after it, so that space is part of the pattern and only the
-            // unescaped one after it goes.
-            (r"foo\ ", r"foo\ "),
-            (r"foo\  ", r"foo\ "),
-            // A `\` with nothing after it leaves the whole line alone, which is what git does
-            // rather than trimming past the end.
-            (r"\", r"\"),
-            (r"a \", r"a \"),
-        ];
-        for (line, expect) in cases {
-            assert_eq!(trim_trailing_spaces(line), expect, "trimmed `{line}`");
-        }
+    #[test_case("foo", "foo" ; "no trailing space")]
+    #[test_case("foo ", "foo" ; "one trailing space")]
+    #[test_case("foo   ", "foo" ; "several trailing spaces")]
+    #[test_case("a b", "a b" ; "an inner space stays")]
+    #[test_case("a b  ", "a b" ; "an inner space stays and the trailing ones go")]
+    #[test_case("   ", "" ; "a line of nothing but spaces empties out")]
+    // Only spaces are stripped, so this line is a pattern for a file whose name is a tab.
+    #[test_case("\t", "\t" ; "a tab is not a space")]
+    #[test_case(" \t ", " \t" ; "the trailing space goes but the tab and the one before it stay")]
+    // A `\` escapes the space after it, so that space is part of the pattern and only the
+    // unescaped one after it goes.
+    #[test_case(r"foo\ ", r"foo\ " ; "an escaped trailing space stays")]
+    #[test_case(r"foo\  ", r"foo\ " ; "an escaped trailing space stays and the one after it goes")]
+    // A `\` with nothing after it leaves the whole line alone, which is what git does rather than
+    // trimming past the end.
+    #[test_case(r"\", r"\" ; "a lone backslash")]
+    #[test_case(r"a \", r"a \" ; "a trailing backslash with nothing after it to escape")]
+    fn trailing_spaces_are_trimmed_like_git_does(line: &str, expect: &str) {
+        assert_eq!(trim_trailing_spaces(line), expect, "trimmed `{line}`");
     }
 
-    #[test]
-    fn pattern_parsing() {
-        let cases = [
-            // line, negated, anchored, dir_only, double_star, path
-            ("foo", false, false, false, false, "foo"),
-            ("!foo", true, false, false, false, "foo"),
-            ("/foo", false, true, false, false, "foo"),
-            ("foo/", false, false, true, false, "foo"),
-            ("!/foo/", true, true, true, false, "foo"),
-            (r"\!foo", false, false, false, false, "!foo"),
-            (r"\#foo", false, false, false, false, "#foo"),
-            ("/", false, false, false, false, "/"),
-            ("**/foo", false, false, false, true, "foo"),
-            // A `/**/` prefix is "at any depth", not an anchor, so this is the same pattern as
-            // `**/foo` and as `foo`.
-            ("/**/foo", false, false, false, true, "foo"),
-            ("/**/foo/", false, false, true, true, "foo"),
-            // With more path left the prefix stays, since `**/a/b` matches `b` in any `a` directory
-            // while `a/b` does not.
-            ("**/a/b", false, false, false, false, "**/a/b"),
-            ("/**/a/b", false, false, false, false, "**/a/b"),
-            ("a/b", false, false, false, false, "a/b"),
-            ("/**", false, true, false, false, "**"),
-            // Git strips the trailing spaces before it does anything else, so these are the same
-            // patterns as the ones without them.
-            ("foo  ", false, false, false, false, "foo"),
-            ("!/foo/ ", true, true, true, false, "foo"),
-            (r"foo\ ", false, false, false, false, r"foo\ "),
-        ];
-        for (line, negated, anchored, dir_only, double_star, path) in cases {
-            let pattern = GitignorePattern::new(line);
-            assert_eq!(pattern.negated, negated, "negated for `{line}`");
-            assert_eq!(pattern.anchored, anchored, "anchored for `{line}`");
-            assert_eq!(pattern.dir_only, dir_only, "dir_only for `{line}`");
-            assert_eq!(pattern.double_star, double_star, "double_star for `{line}`");
-            assert_eq!(pattern.path, path, "path for `{line}`");
-        }
+    #[test_case("foo", false, false, false, false, "foo" ; "a bare name")]
+    #[test_case("!foo", true, false, false, false, "foo" ; "a negation")]
+    #[test_case("/foo", false, true, false, false, "foo" ; "an anchor")]
+    #[test_case("foo/", false, false, true, false, "foo" ; "a dir-only pattern")]
+    #[test_case("!/foo/", true, true, true, false, "foo" ; "negated, anchored and dir-only at once")]
+    #[test_case(r"\!foo", false, false, false, false, "!foo" ; "an escaped bang is not a negation")]
+    #[test_case(r"\#foo", false, false, false, false, "#foo" ; "an escaped hash is not a comment")]
+    #[test_case("/", false, false, false, false, "/" ; "a lone slash")]
+    #[test_case("**/foo", false, false, false, true, "foo" ; "a double star prefix")]
+    // A `/**/` prefix is "at any depth", not an anchor, so this is the same pattern as `**/foo` and
+    // as `foo`.
+    #[test_case("/**/foo", false, false, false, true, "foo" ; "a leading slash on a double star prefix is not an anchor")]
+    #[test_case("/**/foo/", false, false, true, true, "foo" ; "a double star prefix on a dir-only pattern")]
+    // With more path left the prefix stays, since `**/a/b` matches `b` in any `a` directory while
+    // `a/b` does not.
+    #[test_case("**/a/b", false, false, false, false, "**/a/b" ; "a double star prefix with more path left stays in the path")]
+    #[test_case("/**/a/b", false, false, false, false, "**/a/b" ; "the leading slash comes off but the double star prefix stays")]
+    #[test_case("a/b", false, false, false, false, "a/b" ; "a path with no prefix")]
+    #[test_case("/**", false, true, false, false, "**" ; "a trailing double star is anchored")]
+    // Git strips the trailing spaces before it does anything else, so these are the same patterns
+    // as the ones without them.
+    #[test_case("foo  ", false, false, false, false, "foo" ; "trailing spaces are gone before parsing")]
+    #[test_case("!/foo/ ", true, true, true, false, "foo" ; "a trailing space does not hide the dir-only slash")]
+    #[test_case(r"foo\ ", false, false, false, false, r"foo\ " ; "an escaped trailing space is part of the path")]
+    // The four flags really are four separate bools on the parsed pattern, so a test case that
+    // names each one is clearer here than any enum we could fold them into.
+    #[allow(clippy::fn_params_excessive_bools)]
+    fn pattern_parsing(
+        line: &str,
+        negated: bool,
+        anchored: bool,
+        dir_only: bool,
+        double_star: bool,
+        path: &str,
+    ) {
+        let pattern = GitignorePattern::new(line);
+        assert_eq!(pattern.negated, negated, "negated for `{line}`");
+        assert_eq!(pattern.anchored, anchored, "anchored for `{line}`");
+        assert_eq!(pattern.dir_only, dir_only, "dir_only for `{line}`");
+        assert_eq!(pattern.double_star, double_star, "double_star for `{line}`");
+        assert_eq!(pattern.path, path, "path for `{line}`");
     }
 
-    #[test]
-    fn spellings_of_one_pattern_share_a_unique_key() {
-        for same in [
-            ["foo", "**/foo"],
-            ["foo", "/**/foo"],
-            ["**/a/b", "/**/a/b"],
-            ["!foo", "!**/foo"],
-        ] {
-            assert_eq!(
-                unique_key(same[0]),
-                unique_key(same[1]),
-                "`{}` and `{}` are the same pattern",
-                same[0],
-                same[1],
-            );
-        }
+    #[test_case("foo", "**/foo" ; "a bare name is the same as one at any depth")]
+    #[test_case("foo", "/**/foo" ; "a leading slash on a double star prefix changes nothing")]
+    #[test_case("**/a/b", "/**/a/b" ; "a leading slash on a double star prefix with more path changes nothing")]
+    #[test_case("!foo", "!**/foo" ; "a negated bare name is the same as a negated one at any depth")]
+    // Git strips the trailing spaces before it does anything else, so these pairs are the same
+    // pattern too.
+    #[test_case("foo", "foo  " ; "trailing spaces do not make a new pattern")]
+    #[test_case("!/foo/", "!/foo/ " ; "a trailing space does not make a new negated dir pattern")]
+    fn spellings_of_one_pattern_share_a_unique_key(first: &str, second: &str) {
+        assert_eq!(
+            unique_key(first),
+            unique_key(second),
+            "`{first}` and `{second}` are the same pattern",
+        );
+    }
 
-        for same_with_spaces in [["foo", "foo  "], ["!/foo/", "!/foo/ "]] {
-            assert_eq!(
-                unique_key(same_with_spaces[0]),
-                unique_key(same_with_spaces[1]),
-                "`{}` and `{}` are the same pattern, since git strips the trailing spaces",
-                same_with_spaces[0],
-                same_with_spaces[1],
-            );
-        }
-
-        for different in [
-            ["foo", "/foo"],
-            // Trimming the spaces first is what keeps these apart. Untrimmed, both would look like
-            // a negation of the path ` `.
-            ["! ", "!**/ "],
-            [r"foo\ ", "foo"],
-            ["foo", "foo/"],
-            ["foo", "!foo"],
-            [r"\!foo", "!foo"],
-            ["a/b", "**/a/b"],
-        ] {
-            assert_ne!(
-                unique_key(different[0]),
-                unique_key(different[1]),
-                "`{}` and `{}` are different patterns",
-                different[0],
-                different[1],
-            );
-        }
+    #[test_case("foo", "/foo" ; "an anchor makes a new pattern")]
+    // Trimming the spaces first is what keeps these apart. Untrimmed, both would look like a
+    // negation of the path ` `.
+    #[test_case("! ", "!**/ " ; "a negated space is not the same as a negated space at any depth")]
+    #[test_case(r"foo\ ", "foo" ; "an escaped trailing space is part of the pattern")]
+    #[test_case("foo", "foo/" ; "dir-only makes a new pattern")]
+    #[test_case("foo", "!foo" ; "a negation makes a new pattern")]
+    #[test_case(r"\!foo", "!foo" ; "an escaped bang is not a negation")]
+    #[test_case("a/b", "**/a/b" ; "a path with more left is not the same as one at any depth")]
+    fn spellings_of_different_patterns_have_different_unique_keys(first: &str, second: &str) {
+        assert_ne!(
+            unique_key(first),
+            unique_key(second),
+            "`{first}` and `{second}` are different patterns",
+        );
     }
 }
