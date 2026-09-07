@@ -1,4 +1,6 @@
-## Unreleased
+<!-- next-header -->
+
+## NEXT - TBD
 
 - Running `--check` with `--reverse` would incorrectly report a file as unsorted when it had two
   identical lines.

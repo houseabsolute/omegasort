@@ -1,0 +1,33 @@
+allow-branch = ["master"]
+sign-commit = true
+sign-tag = true
+
+# The crate is published to crates.io by the "Publish to crates.io" job in
+# .github/workflows/ci.yml, which is triggered by the tag that cargo-release pushes. Doing it there
+# means a release never depends on a crates.io token being present on a developer's machine.
+publish = false
+
+# By default, cargo-release tags a release "omegasort-v1.2.3". We want a plain "v1.2.3" instead, to
+# match the tags this repo has always used.
+tag-name = "v{{version}}"
+
+pre-release-commit-message = "Bump version and add release date for {{version}}"
+
+# Unlike ubi and precious, this repo is a single crate rather than a workspace, so the replacements
+# can live here. In a workspace anything in this file is applied once per package, and Changes.md
+# would only match for the first one, which is why those repos keep them in Cargo.toml.
+#
+# The order matters. The existing "NEXT" section is stamped with the version and date first, and
+# only then is a fresh "NEXT" section inserted for the next round of changes. Doing it the other
+# way around would leave two "NEXT" headings for the first search to match.
+[[pre-release-replacements]]
+file = "Changes.md"
+search = "## NEXT - TBD"
+replace = "## {{version}} - {{date}}"
+exactly = 1
+
+[[pre-release-replacements]]
+file = "Changes.md"
+search = "<!-- next-header -->"
+replace = "<!-- next-header -->\n\n## NEXT - TBD"
+exactly = 1
