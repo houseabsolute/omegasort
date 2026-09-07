@@ -1,10 +1,22 @@
 name: Lint
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - "**"
+    tags-ignore:
+      - "omegasort-*"
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+permissions:
+  contents: read
 
 env:
-  CRATE_NAME: precious
-  GITHUB_TOKEN: ${{ github.token }}
+  CRATE_NAME: omegasort
   RUST_BACKTRACE: 1
 
 jobs:
@@ -12,23 +24,16 @@ jobs:
     name: Check that code is lint clean using precious
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Cache cargo & target directories
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Install toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - name: Configure Git
         run: |
-          git config --global user.email "jdoe@example.com"
-          git config --global user.name "J. Doe"
-      - name: Install mise
-        run: |
-          set -e
-          set -x
-          curl https://mise.run | sh
-          mise install
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt --no-self-update
+          rustup default stable
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
       - name: Run precious
         run: |
           mise exec -- precious lint -a

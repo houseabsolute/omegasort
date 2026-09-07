@@ -8,6 +8,14 @@ on:
       - "omegasort-*"
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # A tag run is a release, so it is never cancelled part way through creating one.
+  cancel-in-progress: ${{ github.ref_type != 'tag' && github.ref != 'refs/heads/master' }}
+
+permissions:
+  contents: read
+
 env:
   CRATE_NAME: omegasort
   RUST_BACKTRACE: 1
@@ -16,6 +24,10 @@ jobs:
   test:
     name: Test - ${{ matrix.platform.os-name }} with rust ${{ matrix.toolchain }}
     runs-on: ${{ matrix.platform.runs-on }}
+    permissions:
+      # The release itself is created by the "publish-release" job below. Nothing here needs more
+      # than read, since uploading a workflow artifact doesn't use this token.
+      contents: read # For the checkout step.
     strategy:
       fail-fast: false
       matrix:
@@ -23,70 +35,54 @@ jobs:
           - os-name: FreeBSD-x86_64
             runs-on: ubuntu-24.04
             target: x86_64-unknown-freebsd
-            name: omegasort-FreeBSD-x86_64.tar.gz
             skip-tests: true
           - os-name: Linux-x86_64
             runs-on: ubuntu-24.04
             target: x86_64-unknown-linux-musl
-            name: omegasort-Linux-x86_64-musl.tar.gz
           - os-name: Linux-aarch64
             runs-on: ubuntu-24.04
             target: aarch64-unknown-linux-musl
-            name: omegasort-Linux-aarch64-musl.tar.gz
           - os-name: Linux-arm
             runs-on: ubuntu-24.04
             target: arm-unknown-linux-musleabi
-            name: omegasort-Linux-arm-musl.tar.gz
           - os-name: Linux-i686
             runs-on: ubuntu-24.04
             target: i686-unknown-linux-musl
-            name: omegasort-Linux-i686-musl.tar.gz
           - os-name: Linux-powerpc
             runs-on: ubuntu-24.04
             target: powerpc-unknown-linux-gnu
-            name: omegasort-Linux-powerpc-gnu.tar.gz
           - os-name: Linux-powerpc64
             runs-on: ubuntu-24.04
             target: powerpc64-unknown-linux-gnu
-            name: omegasort-Linux-powerpc64-gnu.tar.gz
           - os-name: Linux-powerpc64le
             runs-on: ubuntu-24.04
             target: powerpc64le-unknown-linux-gnu
-            name: omegasort-Linux-powerpc64le.tar.gz
           - os-name: Linux-riscv64
             runs-on: ubuntu-24.04
             target: riscv64gc-unknown-linux-gnu
-            name: omegasort-Linux-riscv64gc-gnu.tar.gz
           - os-name: Linux-s390x
             runs-on: ubuntu-24.04
             target: s390x-unknown-linux-gnu
-            name: omegasort-Linux-s390x-gnu.tar.gz
           - os-name: NetBSD-x86_64
             runs-on: ubuntu-24.04
             target: x86_64-unknown-netbsd
-            name: omegasort-NetBSD-x86_64.tar.gz
             skip-tests: true
           - os-name: Windows-aarch64
             runs-on: windows-latest
             target: aarch64-pc-windows-msvc
-            name: omegasort-Windows-aarch64.zip
             skip-tests: true
           - os-name: Windows-i686
             runs-on: windows-latest
             target: i686-pc-windows-msvc
-            name: omegasort-Windows-i686.zip
           - os-name: Windows-x86_64
             runs-on: windows-latest
             target: x86_64-pc-windows-msvc
-            name: omegasort-Windows-x86_64.zip
           - os-name: macOS-x86_64
             runs-on: macOS-latest
             target: x86_64-apple-darwin
-            name: omegasort-Darwin-x86_64.tar.gz
           - os-name: macOS-aarch64
             runs-on: macOS-latest
             target: aarch64-apple-darwin
-            name: omegasort-Darwin-aarch64.tar.gz
         toolchain:
           - stable
         include:
@@ -101,9 +97,11 @@ jobs:
               target: x86_64-unknown-linux-musl
             toolchain: nightly
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Run tests
-        uses: houseabsolute/actions-rust-cross@v1
+        uses: houseabsolute/actions-rust-cross@21b0f18dc621b25bfae556ff2791fca4173121e8 # v1.0.8
         with:
           command: "test"
           target: ${{ matrix.platform.target }}
@@ -111,15 +109,42 @@ jobs:
           args: "--locked --release"
         if: ${{ !matrix.platform.skip-tests }}
       - name: Build binary
-        uses: houseabsolute/actions-rust-cross@v1
+        uses: houseabsolute/actions-rust-cross@21b0f18dc621b25bfae556ff2791fca4173121e8 # v1.0.8
         with:
           command: "build"
           target: ${{ matrix.platform.target }}
           toolchain: ${{ matrix.toolchain }}
           args: "--locked --release"
-      - name: Publish artifacts and release
-        uses: houseabsolute/actions-rust-release@v0
+      - name: Package artifacts
+        uses: houseabsolute/actions-rust-release@9e126fd5fc18f4cecf358b3909f3991ad59663dc # v1.0.1
         with:
           executable-name: omegasort
           target: ${{ matrix.platform.target }}
         if: matrix.toolchain == 'stable'
+
+  publish-release:
+    name: Publish GitHub release
+    runs-on: ubuntu-24.04
+    # Every target has to have packaged its archive before this can collect them, and waiting also
+    # means a version that cannot build on some platform never gets a release at all. In v0 each
+    # matrix leg created the release itself, so an early finisher could publish a release that was
+    # still missing other platforms' executables.
+    needs: test
+    # The action checks the tag against its own `release-tag-regex` too. This is here so that a
+    # push to a branch doesn't start a job that has nothing to do.
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    permissions:
+      actions: read # Lets the action ask the API which artifacts belong to this run.
+      # This also covers the checkout step, which would otherwise need `contents: read` spelled out.
+      contents: write # Creating the release writes to this repository.
+    steps:
+      # The action uses Changes.md as the body of the release, so the file has to be on disk.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Publish
+        uses: houseabsolute/actions-rust-release/publish@9e126fd5fc18f4cecf358b3909f3991ad59663dc # v1.0.1
+        with:
+          # This is only used to build the default `artifact-regex`, which decides which of the
+          # run's artifacts are attached to the release.
+          executable-name: omegasort

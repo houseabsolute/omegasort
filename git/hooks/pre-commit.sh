@@ -2,4 +2,4 @@
 
 set -e
 
-mise exec -- precious lint -s
+mise exec just -- just lint -s
