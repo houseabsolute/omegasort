@@ -2,6 +2,8 @@
 
 ## NEXT - TBD
 
+## 0.2.1 - 2026-09-07
+
 - Upgraded all crate dependencies. This includes some upgrades flagged by `cargo-audit` for `anyhow`
   and `crossbeam-epoch`.
 
