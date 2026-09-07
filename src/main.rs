@@ -202,35 +202,28 @@ impl Cli {
             self.reverse,
             self.windows,
         )?;
-        let (lines, has_empty_lines, line_ending) =
-            read_lines(&self.file, self.comment_prefix.as_deref())?;
+        let contents = read_lines(&self.file, self.comment_prefix.as_deref())?;
         if self.check {
-            if has_empty_lines {
+            if contents.has_empty_lines {
                 return Err(CheckError::HasUnexpectedEmptyLines.into());
             }
-            if sorter.lines_are_sorted(&lines)? {
+            if sorter.lines_are_sorted(&contents.lines)? {
                 return Ok(());
             }
         }
 
-        self.sort_lines(lines, has_empty_lines, line_ending, &sorter)
+        self.sort_lines(contents, &sorter)
     }
 
-    fn sort_lines(
-        &self,
-        lines: Vec<SortableLine>,
-        has_empty_lines: bool,
-        line_ending: &'static str,
-        sorter: &Sorter,
-    ) -> Result<()> {
-        let orig_hash = if has_empty_lines {
+    fn sort_lines(&self, mut contents: FileContents, sorter: &Sorter) -> Result<()> {
+        let orig_hash = if contents.has_empty_lines {
             None
         } else {
-            Some(hash_lines(&lines))
+            Some(hash_lines(&contents.lines))
         };
-        let lines = sorter.sort_lines(lines)?;
-        if !has_empty_lines {
-            let new_hash = hash_lines(&lines);
+        contents.lines = sorter.sort_lines(contents.lines)?;
+        if !contents.has_empty_lines {
+            let new_hash = hash_lines(&contents.lines);
             if orig_hash.unwrap() == new_hash && !self.stdout {
                 debug!("file is already sorted");
                 return Ok(());
@@ -238,7 +231,7 @@ impl Cli {
         }
 
         if self.stdout {
-            return write_lines_to_writer(lines, line_ending, &mut stdout());
+            return write_lines_to_writer(contents, &mut stdout());
         }
 
         if !self.in_place {
@@ -258,7 +251,7 @@ impl Cli {
         // then the `persist` call later may fail because we may end up trying
         // to rename files across filesystems.
         let mut file = NamedTempFile::new_in(self.file.parent().unwrap())?;
-        write_lines_to_writer(lines, line_ending, &mut file)?;
+        write_lines_to_writer(contents, &mut file)?;
         let temp_path = file.path().to_path_buf();
         file.persist(&self.file).with_context(|| {
             format!(
@@ -297,14 +290,28 @@ impl SortableLine {
     }
 }
 
-fn read_lines<P: AsRef<Path>>(
-    file: P,
-    comment_prefix: Option<&str>,
-) -> Result<(Vec<SortableLine>, bool, &'static str)> {
+/// A file's lines, plus the things about the file itself that have to survive sorting.
+struct FileContents {
+    lines: Vec<SortableLine>,
+    has_empty_lines: bool,
+    line_ending: &'static str,
+    has_bom: bool,
+}
+
+fn read_lines<P: AsRef<Path>>(file: P, comment_prefix: Option<&str>) -> Result<FileContents> {
     let mut f = File::open(file.as_ref())?;
-    let (read, line_ending) = determine_line_ending(&mut f)?;
-    let (lines, has_empty_lines) = lines_from_reader(comment_prefix, read)?;
-    Ok((lines, has_empty_lines, line_ending))
+    let LineEndingChain {
+        reader,
+        line_ending,
+        has_bom,
+    } = determine_line_ending(&mut f)?;
+    let (lines, has_empty_lines) = lines_from_reader(comment_prefix, reader)?;
+    Ok(FileContents {
+        lines,
+        has_empty_lines,
+        line_ending,
+        has_bom,
+    })
 }
 
 fn lines_from_reader<R: Read>(
@@ -364,12 +371,23 @@ fn hash_lines(lines: &[SortableLine]) -> u64 {
     hasher.finish()
 }
 
-fn write_lines_to_writer<W: Write>(
-    lines: Vec<SortableLine>,
-    line_ending: &'static str,
-    out: &mut W,
-) -> Result<()> {
+fn write_lines_to_writer<W: Write>(contents: FileContents, out: &mut W) -> Result<()> {
+    let FileContents {
+        lines,
+        line_ending,
+        has_bom,
+        ..
+    } = contents;
     let mut bw = BufWriter::new(out);
+    // A file that came in with a byte order mark gets it back. So does one whose first line starts
+    // with a mark of its own, even when the file had none, because reading takes a mark off byte 0
+    // without asking whose it is. Writing such a line bare would hand its mark to the file, and the
+    // next read would eat it, turning `<BOM>x` into `x`. Our own mark in front keeps the line's
+    // where it belongs. A collator can sort such a line to the front of a file that never had a
+    // mark, so this is not only a problem for files that came in with one.
+    if has_bom || first_line_written(&lines).starts_with('\u{feff}') {
+        bw.write_all(&UTF8_BOM)?;
+    }
     for (i, l) in lines.into_iter().enumerate() {
         if let Some(comment) = l.comment {
             // If the comment is the first thing in the file we don't preserve
@@ -389,19 +407,52 @@ fn write_lines_to_writer<W: Write>(
     Ok(())
 }
 
+/// The first text that lands in the file, which is the first line's comment block when it has one.
+fn first_line_written(lines: &[SortableLine]) -> &str {
+    let Some(first) = lines.first() else {
+        return "";
+    };
+    first
+        .comment
+        .as_ref()
+        .and_then(|c| c.lines.first())
+        .unwrap_or(&first.line)
+}
+
+const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
+
 const FIRST_CHUNK_SIZE: usize = 2048;
 
 const LINE_ENDINGS: [&str; 3] = ["\r\n", "\n", "\r"];
 
-type LineEndingChain<'a> = (Chain<Cursor<Vec<u8>>, &'a mut File>, &'static str);
+/// A reader for the whole file, plus what reading its first bytes settled.
+struct LineEndingChain<'a> {
+    /// The bytes already read, chained in front of the rest of the file, minus any BOM.
+    reader: Chain<Cursor<Vec<u8>>, &'a mut File>,
+    line_ending: &'static str,
+    has_bom: bool,
+}
 
+/// Reads just far enough to see how the file ends its lines, then hands back a reader for the whole
+/// file along with the answer.
+///
+/// A BOM belongs to the file, not to its first line. We take it off here and
+/// `write_lines_to_writer` puts it back, which keeps it at the front of the file however the lines
+/// are reordered.
 fn determine_line_ending(file: &mut File) -> Result<LineEndingChain<'_>> {
     let mut buf = [0; FIRST_CHUNK_SIZE];
     let read = file.read(&mut buf)?;
 
+    let has_bom = buf[0..read].starts_with(&UTF8_BOM);
+    let start = if has_bom { UTF8_BOM.len() } else { 0 };
+
     for le in LINE_ENDINGS {
         if buf_contains_str(le, &buf) {
-            return Ok((Cursor::new(Vec::from(&buf[0..read])).chain(file), le));
+            return Ok(LineEndingChain {
+                reader: Cursor::new(Vec::from(&buf[start..read])).chain(file),
+                line_ending: le,
+                has_bom,
+            });
         }
     }
 
@@ -429,11 +480,11 @@ fn buf_contains_str(needle: &str, haystack: &[u8]) -> bool {
 mod test {
     use crate::{CheckError, Cli};
 
-    use super::{Comment, SortableLine};
+    use super::{Comment, FileContents, LineEndingChain, SortableLine};
     use anyhow::Result;
     use std::{
         fs::{metadata, read_dir, read_to_string, write, File},
-        io::Write,
+        io::{Read, Write},
         path::PathBuf,
     };
     use tempfile::tempdir;
@@ -615,6 +666,17 @@ baz
         Ok(())
     }
 
+    /// These tests only vary the lines and the BOM, so the rest of a `FileContents` is filled in
+    /// with values that do not affect what is written.
+    fn contents(lines: Vec<SortableLine>, has_bom: bool) -> FileContents {
+        FileContents {
+            lines,
+            has_empty_lines: false,
+            line_ending: "\n",
+            has_bom,
+        }
+    }
+
     #[test]
     fn write_lines_to_writer() -> Result<()> {
         struct TestCase<'a> {
@@ -638,9 +700,37 @@ baz
         for t in tests {
             let mut buf = vec![];
             let (lines, _) = super::lines_from_reader(t.comment_marker, t.input.as_bytes())?;
-            super::write_lines_to_writer(lines, "\n", &mut buf)?;
+            super::write_lines_to_writer(contents(lines, false), &mut buf)?;
             assert_eq!(unsafe { String::from_utf8_unchecked(buf) }, t.expect);
         }
+
+        let mut buf = vec![];
+        let (lines, _) = super::lines_from_reader(None, "a\nb\n".as_bytes())?;
+        super::write_lines_to_writer(contents(lines, true), &mut buf)?;
+        assert_eq!(
+            unsafe { String::from_utf8_unchecked(buf) },
+            "\u{feff}a\nb\n",
+            "a file that had a BOM gets it back, in front of the first line",
+        );
+
+        let mut buf = vec![];
+        let (lines, _) = super::lines_from_reader(None, "\u{feff}a\nb\n".as_bytes())?;
+        super::write_lines_to_writer(contents(lines, false), &mut buf)?;
+        assert_eq!(
+            unsafe { String::from_utf8_unchecked(buf) },
+            "\u{feff}\u{feff}a\nb\n",
+            "a first line that starts with a BOM gets one written in front of it, so that \
+             reading the file back does not take the line's own BOM for the file's",
+        );
+
+        let mut buf = vec![];
+        let (lines, _) = super::lines_from_reader(None, "\u{feff}a\nb\n".as_bytes())?;
+        super::write_lines_to_writer(contents(lines, true), &mut buf)?;
+        assert_eq!(
+            unsafe { String::from_utf8_unchecked(buf) },
+            "\u{feff}\u{feff}a\nb\n",
+            "one BOM for the file and one for the line, and no third one",
+        );
 
         Ok(())
     }
@@ -649,26 +739,43 @@ baz
     fn determine_line_ending() -> Result<()> {
         let mut long_str = "Lorem ipsum dolor sit amet".repeat(100);
         long_str.push('\n');
-        let tests: &[(&str, Result<&str>)] = &[
+        // The third element is whether the file starts with a BOM, which `determine_line_ending`
+        // reports so that it can be written back later.
+        let tests: &[(&str, Result<&str>, bool)] = &[
             (
                 "Lorem ipsum dolor sit amet\nconsectetur adipiscing elit",
                 Ok("\n"),
+                false,
             ),
             (
                 "Lorem ipsum dolor sit amet\rconsectetur adipiscing elit",
                 Ok("\r"),
+                false,
             ),
             (
                 "Lorem ipsum dolor sit amet\r\nconsectetur adipiscing elit",
                 Ok("\r\n"),
+                false,
+            ),
+            (
+                "\u{feff}Lorem ipsum dolor sit amet\nconsectetur adipiscing elit",
+                Ok("\n"),
+                true,
+            ),
+            (
+                "Lorem ipsum\u{feff} dolor sit amet\nconsectetur adipiscing elit",
+                Ok("\n"),
+                false,
             ),
             (
                 "Lorem ipsum dolor sit amet\tconsectetur adipiscing elit",
                 Err(super::could_not_determine_line_ending()),
+                false,
             ),
             (
                 long_str.as_str(),
                 Err(super::could_not_determine_line_ending()),
+                false,
             ),
         ];
 
@@ -682,17 +789,67 @@ baz
             drop(file);
 
             let mut file = File::open(&filename)?;
-            let le = super::determine_line_ending(&mut file).map(|le| le.1);
+            let res = super::determine_line_ending(&mut file);
             if let Ok(expect) = t.1 {
-                assert_eq!(le?, expect);
-            } else {
-                assert!(le.is_err());
+                let LineEndingChain {
+                    mut reader,
+                    line_ending,
+                    has_bom,
+                } = res?;
+                assert_eq!(line_ending, expect, "line ending for {:?}", t.0);
+                assert_eq!(has_bom, t.2, "BOM for {:?}", t.0);
+
+                let mut rest = String::new();
+                reader.read_to_string(&mut rest)?;
                 assert_eq!(
-                    le.unwrap_err().to_string(),
+                    rest,
+                    t.0.strip_prefix('\u{feff}').unwrap_or(t.0),
+                    "the reader hands back the file with any leading BOM taken off",
+                );
+            } else {
+                assert!(res.is_err());
+                assert_eq!(
+                    res.map(|c| c.line_ending).unwrap_err().to_string(),
                     t.1.as_ref().unwrap_err().to_string(),
                 );
             }
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn a_bom_stays_at_the_front_of_the_file() -> Result<()> {
+        let sorted = |extra: &[&str], content: &str| -> Result<String> {
+            let td = tempdir()?;
+            let mut filename = td.path().to_path_buf();
+            filename.push("input.txt");
+            write(&filename, content)?;
+
+            let mut args = vec![
+                String::from("omegasort"),
+                String::from("--sort"),
+                String::from("text"),
+                String::from("--in-place"),
+            ];
+            args.extend(extra.iter().map(|a| String::from(*a)));
+            args.push(filename.to_string_lossy().to_string());
+            Cli::new_from_args(args)?.execute()?;
+
+            Ok(read_to_string(filename)?)
+        };
+
+        assert_eq!(
+            sorted(&[], "\u{feff}zebra\napple\n")?,
+            "\u{feff}apple\nzebra\n",
+            "the BOM does not travel with the line it was in front of",
+        );
+        assert_eq!(
+            sorted(&["--locale", "en-US"], "zzz\n\u{feff}aaa\n")?,
+            "\u{feff}\u{feff}aaa\nzzz\n",
+            "a collator can sort a BOM line to the front of a file that had no BOM. Without the \
+             extra BOM the line would lose its own.",
+        );
 
         Ok(())
     }

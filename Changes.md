@@ -4,6 +4,9 @@
 
 - Running `--check` with `--reverse` would incorrectly report a file as unsorted when it had two
   identical lines.
+- A BOM at the start of a file is no longer treated as part of its first line. Previously, this
+  would be treated as file content and could be sorted onto a different line. Now, the BOM is
+  excluded from sorting and left in place.
 
 ## 0.1.3 - 2023-11-04
 
