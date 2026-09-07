@@ -2,6 +2,8 @@
 
 ## NEXT - TBD
 
+## 0.2.0 - 2026-09-07
+
 - Added a new `gitignore` sorting method. Gitignore files are more complex than just a list of
   paths, and ordering in the file matters when it comes to things like lines with `!` prefixes. See
   the documentation for this sorting method for more details. Addresses GH #13.
