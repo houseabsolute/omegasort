@@ -11,27 +11,27 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = { version = "1.0.99", default-features = false }
-chrono = { version = "0.4.41", default-features = false }
-clap = { version = "4.5.46", features = ["derive", "wrap_help"] }
-dateparser = { version = "0.2.1", default-features = false }
+anyhow = { version = "1.0.104", default-features = false }
+chrono = { version = "0.4.45", default-features = false }
+clap = { version = "4.6.6", features = ["derive", "wrap_help"] }
+dateparser = { version = "0.3.1", default-features = false }
 fern = { version = "0.7.1", default-features = false, features = ["colored"] }
-icu_collator = { version = "2.0.0", default-features = false, features = ["compiled_data"] }
-icu_locale_core = { version = "2.0.0", default-features = false }
-icu_provider = { version = "2.0.0", default-features = false, features = ["sync"] }
-ipnet = { version = "2.11.0", default-features = false }
-lazy-regex = { version = "3.4.1", default-features = false }
-log = { version = "0.4.27", default-features = false }
-rayon = { version = "1.11.0", default-features = false }
-tempfile = { version = "3.21.0", default-features = false }
-termimad = { version = "0.34.0", default-features = false }
-thiserror = { version = "2.0.16", default-features = false }
-typed-path = { version = "0.11.0", default-features = false }
+icu_collator = { version = "2.3.1", default-features = false, features = ["compiled_data"] }
+icu_locale_core = { version = "2.3.0", default-features = false }
+icu_provider = { version = "2.3.1", default-features = false, features = ["sync"] }
+ipnet = { version = "2.12.1", default-features = false }
+lazy-regex = { version = "3.6.1", default-features = false }
+log = { version = "0.4.34", default-features = false }
+rayon = { version = "1.12.0", default-features = false }
+tempfile = { version = "3.27.0", default-features = false }
+termimad = { version = "0.35.3", default-features = false }
+thiserror = { version = "2.0.20", default-features = false }
+typed-path = { version = "0.12.3", default-features = false }
 
 [dev-dependencies]
-tempfile = { version = "3.21.0", default-features = false }
+tempfile = { version = "3.27.0", default-features = false }
 test-case = { version = "3.3.1", default-features = false }
-test-log = { version = "0.2.18", default-features = false }
+test-log = { version = "0.2.21", default-features = false }
 
 # workaround for https://github.com/cross-rs/cross/issues/1345
 [package.metadata.cross.target.x86_64-unknown-netbsd]

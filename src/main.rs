@@ -676,6 +676,7 @@ baz
         );
     }
 
+    #[allow(clippy::too_many_lines)]
     #[test]
     fn lines_from_reader() -> Result<()> {
         let lines = ["foo", "bar", "baz", "quux"]
@@ -819,6 +820,7 @@ baz
         }
     }
 
+    #[allow(clippy::items_after_statements)]
     #[test]
     fn write_lines_to_writer() -> Result<()> {
         struct TestCase<'a> {
