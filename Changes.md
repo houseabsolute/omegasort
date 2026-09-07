@@ -2,6 +2,9 @@
 
 ## NEXT - TBD
 
+- Upgraded all crate dependencies. This includes some upgrades flagged by `cargo-audit` for `anyhow`
+  and `crossbeam-epoch`.
+
 ## 0.2.0 - 2026-09-07
 
 - Added a new `gitignore` sorting method. Gitignore files are more complex than just a list of
